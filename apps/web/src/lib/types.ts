@@ -1,0 +1,20 @@
+export type Tenant = {
+  id: string;
+  nome_fantasia: string;
+  razao_social: string;
+  cnpj: string;
+  segmento: 'LOCADORA' | 'SERRALHERIA' | 'MISTO';
+  role: 'ADMIN' | 'OPERADOR' | 'FINANCEIRO';
+  telefone?: string | null;
+  email?: string | null;
+  inscricao_estadual?: string | null;
+  cep?: string | null;
+  logradouro?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  updated_at?: string;
+};
+export type Session = { user: { id: string; name: string; email: string }; activeTenant: Tenant; userTenants: Tenant[]; token: string };
+export type Row = Record<string, string | number | null>;

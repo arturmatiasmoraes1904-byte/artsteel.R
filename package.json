@@ -1,0 +1,14 @@
+{
+  "name": "nexo-operacoes", "private": true, "version": "0.1.0",
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,green \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "dev:demo": "concurrently -n api,web -c cyan,green \"npm run dev:demo -w apps/api\" \"npm run dev -w apps/web\"",
+    "build": "npm run build -w apps/api && npm run build -w apps/web",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test -w apps/api",
+    "db:migrate": "npm run db:migrate -w apps/api",
+    "db:seed": "npm run db:seed -w apps/api"
+  },
+  "devDependencies": { "concurrently": "^9.2.1", "typescript": "^5.9.3", "@types/node": "^24.10.0" }
+}

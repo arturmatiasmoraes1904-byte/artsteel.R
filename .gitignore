@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.next-build/
+.vercel-local/
+dist/
+.env
+.env.local
+*.tsbuildinfo
+*.log
+
+.env.*
+!.env.example
+apps/api/data/
+*.pem
+*.key
+.DS_Store
+Thumbs.db
