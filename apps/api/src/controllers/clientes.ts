@@ -132,15 +132,22 @@ export async function clientesRoutes(app: FastifyInstance, db: Database) {
     return {success:true,data:result,error:null};
   });
 
+  const emptyToNull = (val: unknown) => (typeof val === 'string' && val.trim() === '' ? null : val);
+  const optText = (max: number) => z.preprocess(emptyToNull, z.string().trim().max(max).nullable().optional());
+
   app.post('/clientes', async req => {
     const body = z.object({
-      nome: z.string().min(1).max(200),
-      documento: z.string().max(20).optional().nullable(),
-      email: z.string().email().max(200).optional().nullable(),
-      telefone: z.string().max(20).optional().nullable(),
+      nome: optText(200),
+      documento: optText(20),
+      email: z.preprocess(emptyToNull, z.string().trim().email('E-mail inválido.').max(200).nullable().optional()),
+      telefone: optText(20),
       endereco: z.record(z.string(), z.unknown()).optional().nullable(),
-      status: z.string().max(50).default('ATIVO')
-    }).parse(req.body);
+      status: optText(50)
+    }).transform(v => ({
+      ...v,
+      nome: v.nome || 'Cliente sem nome',
+      status: v.status || 'ATIVO',
+    })).parse(req.body ?? {});
 
     const rows = await withTenant(db, req.user.current_tenant_id, tx => 
       tx.execute(sql`
@@ -154,24 +161,26 @@ export async function clientesRoutes(app: FastifyInstance, db: Database) {
 
   app.put('/clientes/:id', async req => {
     const id = z.string().uuid().parse((req.params as { id: string }).id);
+    const rawBody = (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>;
+    const hasField = (key: string) => Object.prototype.hasOwnProperty.call(rawBody, key);
     const body = z.object({
-      nome: z.string().min(1).max(200).optional(),
-      documento: z.string().max(20).optional().nullable(),
-      email: z.string().email().max(200).optional().nullable(),
-      telefone: z.string().max(20).optional().nullable(),
+      nome: optText(200),
+      documento: optText(20),
+      email: z.preprocess(emptyToNull, z.string().trim().email('E-mail inválido.').max(200).nullable().optional()),
+      telefone: optText(20),
       endereco: z.record(z.string(), z.unknown()).optional().nullable(),
-      status: z.string().max(50).optional()
-    }).parse(req.body);
+      status: optText(50)
+    }).parse(rawBody);
 
     const rows = await withTenant(db, req.user.current_tenant_id, tx => 
       tx.execute(sql`
         UPDATE clientes
-        SET nome = COALESCE(${body.nome ?? null}, nome),
-            documento = COALESCE(${body.documento ?? null}, documento),
-            email = COALESCE(${body.email ?? null}, email),
-            telefone = COALESCE(${body.telefone ?? null}, telefone),
-            endereco = COALESCE(${body.endereco ? sql`${JSON.stringify(body.endereco)}::jsonb` : null}, endereco),
-            status = COALESCE(${body.status ?? null}, status)
+        SET nome = CASE WHEN ${hasField('nome')} THEN COALESCE(${body.nome ?? null}::text, 'Cliente sem nome') ELSE nome END,
+            documento = CASE WHEN ${hasField('documento')} THEN ${body.documento ?? null}::text ELSE documento END,
+            email = CASE WHEN ${hasField('email')} THEN ${body.email ?? null}::text ELSE email END,
+            telefone = CASE WHEN ${hasField('telefone')} THEN ${body.telefone ?? null}::text ELSE telefone END,
+            endereco = CASE WHEN ${hasField('endereco')} THEN ${body.endereco ? JSON.stringify(body.endereco) : null}::jsonb ELSE endereco END,
+            status = CASE WHEN ${hasField('status')} THEN COALESCE(${body.status ?? null}::text, 'ATIVO') ELSE status END
       WHERE id = ${id} AND status <> 'INATIVO'
         RETURNING id, nome, documento, email, telefone, endereco, status
       `)

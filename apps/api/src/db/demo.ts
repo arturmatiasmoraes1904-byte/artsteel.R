@@ -17,12 +17,19 @@ await pg.exec(`
   create table if not exists orcamento_historico(id uuid primary key default gen_random_uuid(),tenant_id uuid not null,orcamento_id uuid not null,evento text not null,motivo text,actor_user_id uuid,ip text,user_agent text,metadata jsonb,created_at timestamptz not null default now());
   alter table transacoes_financeiras add column if not exists orcamento_id uuid;
   alter table transacoes_financeiras add column if not exists producao_card_id uuid;
+  alter table equipamentos add column if not exists modelo text;
+  alter table equipamentos add column if not exists criticidade text not null default 'Média';
+  alter table equipamentos add column if not exists data_aquisicao date;
+  alter table equipamentos add column if not exists localizacao text;
   alter table equipamentos add column if not exists deleted_at timestamptz;
   alter table contratos_locacao add column if not exists periodicidade text default 'MENSAL';
   alter table contratos_locacao add column if not exists dia_vencimento integer default 5;
   alter table contratos_locacao add column if not exists indice_reajuste text default 'IGP-M';
   alter table contratos_locacao add column if not exists observacoes text;
   alter table contratos_locacao add column if not exists documento_url text;
+  alter table contratos_locacao add column if not exists renovacao_automatica boolean not null default true;
+  alter table contratos_locacao add column if not exists ciclos_cobrados integer not null default 1;
+  alter table contratos_locacao add column if not exists proximo_vencimento date;
   alter table ordens_manutencao add column if not exists tipo_manutencao text;
   alter table ordens_manutencao add column if not exists descricao_problema text;
   alter table ordens_manutencao add column if not exists tecnico_responsavel text;
@@ -43,7 +50,7 @@ for(const company of companies){
     for(const [i,name] of equipment.entries()){
       const {rows:[asset]}=await pg.query<{id:string}>('insert into equipamentos(tenant_id,nome,numero_patrimonio,categoria,status,valor_diaria,valor_reposicao) values($1,$2,$3,$4,$5,$6,$7) returning id',[company.id,name,'PAT-'+String(i+1).padStart(3,'0'),['Concreto','Compactação','Demolição','Acesso','Energia','Concreto','Compactação','Demolição'][i],i===4?'MANUTENCAO':i<3?'LOCADO':'DISPONIVEL',[90,150,85,35,220,65,110,70][i],6000]);
       if(i<3){
-        const {rows:[contract]}=await pg.query<{id:string}>("insert into contratos_locacao(tenant_id,cliente_id,data_inicio,data_fim_prevista,valor_total,condicao_pagamento) values($1,$2,current_date-5,current_date+10,$3,'À vista') returning id",[company.id,customer.id,[90,150,85][i]*15]);
+        const {rows:[contract]}=await pg.query<{id:string}>("insert into contratos_locacao(tenant_id,cliente_id,data_inicio,data_fim_prevista,renovacao_automatica,ciclos_cobrados,proximo_vencimento,valor_total,condicao_pagamento) values($1,$2,current_date-5,null,true,1,(current_date-5+interval '1 month')::date,$3,'À vista') returning id",[company.id,customer.id,[90,150,85][i]*15]);
         await pg.query('insert into itens_contrato(tenant_id,contrato_id,equipamento_id,valor_unitario) values($1,$2,$3,$4)',[company.id,contract.id,asset.id,[90,150,85][i]]);
       }
       if(i===4)await pg.query("insert into ordens_manutencao(tenant_id,equipamento_id,tipo,descricao) values($1,$2,'PREVENTIVA','Revisão de filtros e lubrificação')",[company.id,asset.id]);

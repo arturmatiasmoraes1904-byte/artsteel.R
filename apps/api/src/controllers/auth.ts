@@ -11,7 +11,7 @@ export async function authRoutes(app: FastifyInstance, db: Database) {
     const tenants = await userTenants(db, user.id);
     const active = tenantId ? tenants.find(t => t.id === tenantId) : tenants[0];
     if (!active) throw new HttpError(403, 'TENANT_ACCESS_DENIED', 'Empresa não autorizada.');
-    return { user, userTenants: tenants, activeTenant: active, token: app.jwt.sign({ sub: user.id, current_tenant_id: String(active.id) }, { expiresIn: rememberMe ? '7d' : '15m' }) };
+    return { user, userTenants: tenants, activeTenant: active, token: app.jwt.sign({ sub: user.id, current_tenant_id: String(active.id), remember: Boolean(rememberMe) }, { expiresIn: rememberMe ? '30d' : '12h' }) };
   };
   app.post('/auth/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async req => {
     const body = z.object({ email: z.email().max(254), password: z.string().min(1).max(200), rememberMe: z.boolean().optional() }).strict().parse(req.body);
@@ -24,6 +24,6 @@ export async function authRoutes(app: FastifyInstance, db: Database) {
   app.post('/auth/switch-tenant', { preHandler: auth(db) }, async req => {
     const { target_tenant_id } = z.object({ target_tenant_id: z.uuid() }).strict().parse(req.body);
     const [user] = await db.execute(sql`select id,name,email from users where id=${req.user.sub}::uuid`);
-    return { success: true, data: await session({ id: String(user.id), name: String(user.name), email: String(user.email) }, target_tenant_id), error: null };
+    return { success: true, data: await session({ id: String(user.id), name: String(user.name), email: String(user.email) }, target_tenant_id, Boolean(req.user.remember)), error: null };
   });
 }

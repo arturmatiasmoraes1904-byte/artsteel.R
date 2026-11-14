@@ -174,7 +174,7 @@ export async function equipamentosRoutes(app: FastifyInstance, db: Database) {
     const rows = await withTenant(db, req.user.current_tenant_id, tx => 
       tx.execute(sql`UPDATE equipamentos SET deleted_at = NOW() WHERE id = ${id} RETURNING id`)
     );
-    if (!rows[0]) throw new HttpError(404, 'NOT_FOUND', 'Equipamento nÃ£o encontrado.');
+    if (!rows[0]) throw new HttpError(404, 'NOT_FOUND', 'Equipamento não encontrado.');
     return { success: true, data: null, error: null };
   });
 
@@ -200,9 +200,9 @@ export async function equipamentosRoutes(app: FastifyInstance, db: Database) {
       if (filters.tipo) where.push(sql`m.tipo_manutencao = ${filters.tipo}`);
       if (filters.tecnico) where.push(sql`m.tecnico_responsavel ILIKE ${`%${filters.tecnico}%`}`);
       if (filters.equipamento_id) where.push(sql`m.equipamento_id = ${filters.equipamento_id}::uuid`);
-      if (filters.search) where.push(sql`(m.descricao ILIKE ${`%${filters.search}%`} OR e.nome ILIKE ${`%${filters.search}%`} OR e.patrimonio ILIKE ${`%${filters.search}%`})`);
+      if (filters.search) where.push(sql`(m.descricao ILIKE ${`%${filters.search}%`} OR e.nome ILIKE ${`%${filters.search}%`} OR e.numero_patrimonio ILIKE ${`%${filters.search}%`})`);
       return tx.execute(sql`
-        SELECT m.*, m.descricao as descricao_problema, e.nome as equipamento_nome, coalesce(e.patrimonio, e.numero_patrimonio) as equipamento_patrimonio
+        SELECT m.*, m.descricao as descricao_problema, e.nome as equipamento_nome, e.numero_patrimonio as equipamento_patrimonio
         FROM ordens_manutencao m
         JOIN equipamentos e ON e.id = m.equipamento_id
         WHERE ${sql.join(where, sql` AND `)}

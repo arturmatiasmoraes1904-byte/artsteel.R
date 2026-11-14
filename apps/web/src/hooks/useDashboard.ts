@@ -8,7 +8,7 @@ export type DashboardContact={id:string;name:string;email?:string|null;phone?:st
 export type DashboardMetrics={
   ocupacao?:number; manutencao?:number; faturamento?:number; inadimplencia?:number;
   tempo_medio?:number|null; margem?:number|null; desperdicio?:number|null; otd?:number|null;
-  recebiveis?:number; recebido?:number; ebitda?:number|null;
+  recebiveis?:number; recebido?:number; ebitda?:number|null; despesas?:number; despesas_pendentes?:number; resultado_operacional?:number|null;
   categories?:Record<string,string|number>[]; stages?:Record<string,string|number>[];
   costs?:Record<string,string|number>[]; companies?:Record<string,string|number>[];
   salesMix?:{name:string;value:number}[]; revenueHistory?:{name:string;value:number}[];

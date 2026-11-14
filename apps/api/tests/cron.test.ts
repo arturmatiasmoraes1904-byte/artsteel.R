@@ -24,4 +24,8 @@ test('valida CRON_SECRET antes de executar o cron', async () => {
   assert.equal(response.statusCode, 401);
   response = await (await appPromise).inject({ method: 'POST', url: '/cron/check-contracts', headers: { 'x-cron-secret': 'correct-secret' } });
   assert.equal(response.statusCode, 200);
+  response = await (await appPromise).inject({ method: 'GET', url: '/cron/check-contracts', headers: { authorization: 'Bearer wrong-secret' } });
+  assert.equal(response.statusCode, 401);
+  response = await (await appPromise).inject({ method: 'GET', url: '/cron/check-contracts', headers: { authorization: 'Bearer correct-secret' } });
+  assert.equal(response.statusCode, 200);
 });

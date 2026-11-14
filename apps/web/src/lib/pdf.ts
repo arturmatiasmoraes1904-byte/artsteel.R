@@ -600,13 +600,13 @@ export function createContractPdf(contract: ContractData) {
   // Cabeçalho no estilo exato do modelo enviado
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(20);
-  doc.setTextColor(36, 61, 90);
+  doc.setTextColor(22, 23, 26);
   doc.text((contract.titulo_principal || 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS').toUpperCase(), marginX, y);
   y += 9;
   doc.text((contract.subtitulo || 'SERRALHERIA ARTSTEEL').toUpperCase(), marginX, y);
   y += 4;
 
-  doc.setDrawColor(95, 130, 170);
+  doc.setDrawColor(148, 154, 166);
   doc.setLineWidth(0.4);
   doc.line(marginX, y, pageWidth - marginX, y);
   y += 14;
@@ -652,7 +652,7 @@ export function createContractPdf(contract: ContractData) {
     if (clausula.titulo?.trim()) {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
-      doc.setTextColor(54, 95, 145);
+      doc.setTextColor(55, 60, 68);
       doc.text(clausula.titulo.trim().toUpperCase(), marginX, y);
       y += 6.5;
     }

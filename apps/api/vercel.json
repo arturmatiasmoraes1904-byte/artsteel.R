@@ -10,5 +10,11 @@
       "source": "/(.*)",
       "destination": "/api/index.ts"
     }
+  ],
+  "crons": [
+    {
+      "path": "/cron/check-contracts",
+      "schedule": "0 6 * * *"
+    }
   ]
 }

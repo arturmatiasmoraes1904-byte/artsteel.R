@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { sql } from 'drizzle-orm';
 import { withTenant, type Database } from '../db/client.js';
 import { auth, HttpError, requireRole } from '../middlewares/auth.js';
+import { addMonthsClamped, hasRenewalColumns, processTenantContractRenewals } from '../services/contract-renewal.js';
 
 export async function contratosRoutes(app: FastifyInstance, db: Database) {
   app.addHook('preHandler', auth(db));
@@ -11,25 +12,40 @@ export async function contratosRoutes(app: FastifyInstance, db: Database) {
   });
 
   app.get('/locacao/contratos/dashboard', async req => {
-    const rows = await withTenant(db, req.user.current_tenant_id, tx => 
-      tx.execute(sql`
+    const rows = await withTenant(db, req.user.current_tenant_id, async tx => {
+      const hasRenewalCols = await hasRenewalColumns(tx);
+      if (hasRenewalCols) {
+        await processTenantContractRenewals(tx, req.user.current_tenant_id);
+      }
+      return tx.execute(hasRenewalCols ? sql`
         SELECT 
           COUNT(*) as total_contratos,
           COUNT(CASE WHEN status = 'ATIVO' THEN 1 END) as contratos_ativos,
           SUM(CASE WHEN status = 'ATIVO' THEN valor_total ELSE 0 END) as receita_recorrente,
-          COUNT(CASE WHEN data_fim_prevista < CURRENT_DATE AND status = 'ATIVO' THEN 1 END) as vencidos
+          COUNT(CASE WHEN data_fim_prevista IS NOT NULL AND data_fim_prevista < CURRENT_DATE AND status = 'ATIVO' THEN 1 END) as vencidos,
+          COUNT(CASE WHEN status = 'ATIVO' AND COALESCE(renovacao_automatica, true) = true AND proximo_vencimento <= CURRENT_DATE + INTERVAL '7 days' THEN 1 END) as proximas_renovacoes
         FROM contratos_locacao
         WHERE deleted_at IS NULL
-      `)
-    );
-    const data = rows[0] || { total_contratos: 0, contratos_ativos: 0, receita_recorrente: 0, vencidos: 0 };
+      ` : sql`
+        SELECT 
+          COUNT(*) as total_contratos,
+          COUNT(CASE WHEN status = 'ATIVO' THEN 1 END) as contratos_ativos,
+          SUM(CASE WHEN status = 'ATIVO' THEN valor_total ELSE 0 END) as receita_recorrente,
+          COUNT(CASE WHEN data_fim_prevista IS NOT NULL AND data_fim_prevista < CURRENT_DATE AND status = 'ATIVO' THEN 1 END) as vencidos,
+          0 as proximas_renovacoes
+        FROM contratos_locacao
+        WHERE deleted_at IS NULL
+      `);
+    });
+    const data = rows[0] || { total_contratos: 0, contratos_ativos: 0, receita_recorrente: 0, vencidos: 0, proximas_renovacoes: 0 };
     return { success: true, data, error: null };
   });
 
   app.get('/locacao/contratos', async req => {
     const {cliente_id}=z.object({cliente_id:z.string().uuid().optional()}).parse(req.query);
-    const rows = await withTenant(db, req.user.current_tenant_id, tx => 
-      tx.execute(sql`
+    const rows = await withTenant(db, req.user.current_tenant_id, async tx => {
+      await processTenantContractRenewals(tx, req.user.current_tenant_id);
+      return tx.execute(sql`
         SELECT c.*, cl.nome as cliente_nome, cl.documento as cliente_documento,
           COALESCE(
             (
@@ -49,17 +65,20 @@ export async function contratosRoutes(app: FastifyInstance, db: Database) {
         JOIN clientes cl ON cl.id = c.cliente_id
         WHERE c.deleted_at IS NULL ${cliente_id ? sql`AND c.cliente_id = ${cliente_id}::uuid` : sql``}
         ORDER BY c.data_inicio DESC
-      `)
-    );
+      `);
+    });
     return { success: true, data: rows, error: null };
   });
 
   app.post('/locacao/contratos', async req => {
+    const rawBody = (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>;
+    const hasExplicitDiaVencimento = Object.prototype.hasOwnProperty.call(rawBody, 'dia_vencimento');
     const body = z.object({
       cliente_id: z.string().uuid(),
       data_inicio: z.iso.date(),
-      data_fim: z.iso.date().optional(),
-      data_fim_prevista: z.iso.date().optional(),
+      data_fim: z.iso.date().optional().nullable(),
+      data_fim_prevista: z.iso.date().optional().nullable(),
+      renovacao_automatica: z.boolean().optional(),
       valor_total: z.number().finite().min(0).optional(),
       condicao_pagamento: z.string().trim().max(500).optional(),
       equipamento_ids: z.array(z.string().uuid()).optional(),
@@ -74,24 +93,29 @@ export async function contratosRoutes(app: FastifyInstance, db: Database) {
         quantidade: z.number().int().min(1).default(1)
       })).optional()
     }).superRefine((value, context) => {
-      const endDate = value.data_fim_prevista ?? value.data_fim;
-      if (!endDate) {
-        context.addIssue({ code: 'custom', path: ['data_fim_prevista'], message: 'Informe a data de fim do contrato.' });
-      } else if (endDate <= value.data_inicio) {
+      const endDate = value.data_fim_prevista ?? value.data_fim ?? null;
+      if (endDate && endDate <= value.data_inicio) {
         context.addIssue({ code: 'custom', path: ['data_fim_prevista'], message: 'A data de fim deve ser posterior à data de início.' });
       }
       const equipmentIds = value.equipamento_ids ?? value.equipamentos?.map(item => item.equipamento_id) ?? [];
       if (new Set(equipmentIds).size !== equipmentIds.length) {
         context.addIssue({ code: 'custom', path: ['equipamento_ids'], message: 'Não é permitido selecionar o mesmo equipamento mais de uma vez.' });
       }
-    }).parse(req.body);
-    const dataFim = body.data_fim_prevista ?? body.data_fim!;
+    }).parse(rawBody);
+    const dataFim = body.data_fim_prevista ?? body.data_fim ?? null;
+    const isOpenEnded = !dataFim;
+    const renovacaoAutomatica = body.renovacao_automatica ?? isOpenEnded;
+    const proximoVencimento = addMonthsClamped(body.data_inicio, 1);
     const equipamentoIds = body.equipamento_ids ?? body.equipamentos?.map(item => item.equipamento_id) ?? [];
     if (equipamentoIds.length === 0) {
       throw new HttpError(400, 'EQUIPMENT_REQUIRED', 'Selecione pelo menos um equipamento para o contrato.');
     }
 
     const result = await withTenant(db, req.user.current_tenant_id, async tx => {
+      const hasRenewalCols = await hasRenewalColumns(tx);
+      if (!hasRenewalCols && !dataFim) {
+        throw new HttpError(503, 'DATABASE_MIGRATION_REQUIRED', 'Aplique a migração 022 (npm run db:migrate) para criar contratos sem data de término.');
+      }
       const [cliente] = await tx.execute(sql`SELECT id, nome FROM clientes WHERE id = ${body.cliente_id}::uuid AND status <> 'INATIVO'`);
       if (!cliente) throw new HttpError(400, 'INVALID_CUSTOMER', 'Selecione um cliente ativo desta empresa.');
 
@@ -99,6 +123,7 @@ export async function contratosRoutes(app: FastifyInstance, db: Database) {
       const equipment = await tx.execute(sql`
         SELECT id, valor_diaria, status FROM equipamentos
         WHERE id IN (${sql.join(equipamentoIds.map(id => sql`${id}::uuid`), sql`,`)})
+          AND deleted_at IS NULL
         ORDER BY id
         FOR UPDATE
       `);
@@ -109,15 +134,30 @@ export async function contratosRoutes(app: FastifyInstance, db: Database) {
         throw new HttpError(409, 'EQUIPMENT_UNAVAILABLE', 'Um dos equipamentos selecionados não está disponível. Atualize a lista e tente novamente.');
       }
 
-      const days = Math.max(1, Math.floor((Date.parse(`${dataFim}T00:00:00Z`) - Date.parse(`${body.data_inicio}T00:00:00Z`)) / 86400000));
+      const days = dataFim
+        ? Math.max(1, Math.floor((Date.parse(`${dataFim}T00:00:00Z`) - Date.parse(`${body.data_inicio}T00:00:00Z`)) / 86400000))
+        : 1;
       const total = body.valor_total ?? equipment.reduce((sum, item) => sum + Number(item.valor_diaria) * days, 0);
-      const [contrato] = await tx.execute(sql`
+      const [contrato] = await tx.execute(hasRenewalCols ? sql`
         INSERT INTO contratos_locacao (
-          tenant_id, cliente_id, data_inicio, data_fim_prevista, valor_total,
-          condicao_pagamento, periodicidade, dia_vencimento, indice_reajuste, observacoes, status
+          tenant_id, cliente_id, data_inicio, data_fim_prevista,
+          renovacao_automatica, ciclos_cobrados, proximo_vencimento,
+          valor_total, condicao_pagamento, periodicidade, dia_vencimento, indice_reajuste, observacoes, status
         ) VALUES (
           ${req.user.current_tenant_id}::uuid, ${body.cliente_id}::uuid, ${body.data_inicio}::date,
-          ${dataFim}::date, ${total}, ${body.condicao_pagamento?.trim() || 'A definir'},
+          ${dataFim ? sql`${dataFim}::date` : null},
+          ${renovacaoAutomatica}, 1, ${proximoVencimento}::date,
+          ${total}, ${body.condicao_pagamento?.trim() || 'À combinar'},
+          ${body.periodicidade}, ${body.dia_vencimento}, ${body.indice_reajuste}, ${body.observacoes ?? null}, ${body.status}
+        ) RETURNING *
+      ` : sql`
+        INSERT INTO contratos_locacao (
+          tenant_id, cliente_id, data_inicio, data_fim_prevista,
+          valor_total, condicao_pagamento, periodicidade, dia_vencimento, indice_reajuste, observacoes, status
+        ) VALUES (
+          ${req.user.current_tenant_id}::uuid, ${body.cliente_id}::uuid, ${body.data_inicio}::date,
+          ${sql`${dataFim!}::date`},
+          ${total}, ${body.condicao_pagamento?.trim() || 'À combinar'},
           ${body.periodicidade}, ${body.dia_vencimento}, ${body.indice_reajuste}, ${body.observacoes ?? null}, ${body.status}
         ) RETURNING *
       `);
@@ -154,14 +194,18 @@ export async function contratosRoutes(app: FastifyInstance, db: Database) {
         }
 
         if (total > 0) {
-          const startDate = new Date(`${body.data_inicio}T00:00:00Z`);
-          const dueYear = startDate.getUTCFullYear();
-          const dueMonth = startDate.getUTCMonth() + (body.dia_vencimento < startDate.getUTCDate() ? 1 : 0);
-          const targetMonth = new Date(Date.UTC(dueYear, dueMonth, 1));
-          const lastDay = new Date(Date.UTC(targetMonth.getUTCFullYear(), targetMonth.getUTCMonth() + 1, 0)).getUTCDate();
-          const dueDate = new Date(Date.UTC(targetMonth.getUTCFullYear(), targetMonth.getUTCMonth(), Math.min(body.dia_vencimento, lastDay))).toISOString().slice(0, 10);
+          let dueDate = body.data_inicio;
+          if (hasExplicitDiaVencimento) {
+            const startDate = new Date(`${body.data_inicio}T00:00:00Z`);
+            const dueYear = startDate.getUTCFullYear();
+            const dueMonth = startDate.getUTCMonth() + (body.dia_vencimento < startDate.getUTCDate() ? 1 : 0);
+            const targetMonth = new Date(Date.UTC(dueYear, dueMonth, 1));
+            const lastDay = new Date(Date.UTC(targetMonth.getUTCFullYear(), targetMonth.getUTCMonth() + 1, 0)).getUTCDate();
+            dueDate = new Date(Date.UTC(targetMonth.getUTCFullYear(), targetMonth.getUTCMonth(), Math.min(body.dia_vencimento, lastDay))).toISOString().slice(0, 10);
+          }
           const anexos = JSON.stringify({
             contrato_id: contrato.id,
+            ciclo: 1,
             tipo_origem: 'CONTRATO_LOCACAO',
             periodicidade: body.periodicidade,
             dia_vencimento: body.dia_vencimento
@@ -173,11 +217,20 @@ export async function contratosRoutes(app: FastifyInstance, db: Database) {
               status, categoria, conta_bancaria, cliente_id, anexos
             ) VALUES (
               ${req.user.current_tenant_id}::uuid, 'RECEITA',
-              ${`Locação: Contrato #${String(contrato.id).slice(0, 8)} - ${cliente.nome}`},
+              ${`${isOpenEnded ? 'Mensalidade Locação (Ciclo 1)' : 'Locação'}: Contrato #${String(contrato.id).slice(0, 8)} - ${cliente.nome}`},
               ${total}, ${body.data_inicio}::date, ${dueDate}::date, 'PENDENTE',
               'Locação', 'Conta Principal', ${body.cliente_id}::uuid, ${anexos}::jsonb
             )
           `);
+        }
+
+        if (renovacaoAutomatica && hasRenewalCols) {
+          await processTenantContractRenewals(tx, req.user.current_tenant_id);
+          const [refreshed] = await tx.execute(sql`
+            SELECT * FROM contratos_locacao
+            WHERE tenant_id = ${req.user.current_tenant_id}::uuid AND id = ${contrato.id}::uuid
+          `);
+          if (refreshed) return refreshed;
         }
       }
 
@@ -190,7 +243,16 @@ export async function contratosRoutes(app: FastifyInstance, db: Database) {
   app.put('/locacao/contratos/:id/encerrar', async req => {
     const id = z.string().uuid().parse((req.params as { id: string }).id);
     const rows = await withTenant(db, req.user.current_tenant_id, async tx => {
-      const updated = await tx.execute(sql`
+      const hasRenewalCols = await hasRenewalColumns(tx);
+      const updated = await tx.execute(hasRenewalCols ? sql`
+        UPDATE contratos_locacao
+        SET status = 'ENCERRADO', renovacao_automatica = false
+        WHERE tenant_id = ${req.user.current_tenant_id}::uuid
+          AND id = ${id}::uuid
+          AND deleted_at IS NULL
+          AND status = 'ATIVO'
+        RETURNING *
+      ` : sql`
         UPDATE contratos_locacao
         SET status = 'ENCERRADO'
         WHERE tenant_id = ${req.user.current_tenant_id}::uuid

@@ -4,11 +4,12 @@ import { sql } from 'drizzle-orm';
 import { withTenant, type Database } from '../db/client.js';
 import { auth, HttpError, requireRole } from '../middlewares/auth.js';
 import {pageQuery,pageResult,safeSort} from '../lib/pagination.js';
+import { addMonthsClamped } from '../services/contract-renewal.js';
 
 const approvalSchema=z.object({
-  locacao:z.object({data_inicio:z.iso.date(),data_fim_prevista:z.iso.date()}).optional(),
+  locacao:z.object({data_inicio:z.iso.date().optional(),data_fim_prevista:z.iso.date().optional().nullable()}).optional(),
 }).strict().superRefine((value,context)=>{
-  if(value.locacao&&value.locacao.data_fim_prevista<=value.locacao.data_inicio){
+  if(value.locacao?.data_inicio&&value.locacao?.data_fim_prevista&&value.locacao.data_fim_prevista<=value.locacao.data_inicio){
     context.addIssue({code:'custom',path:['locacao','data_fim_prevista'],message:'A data final da locação deve ser posterior à data inicial.'});
   }
 });
@@ -262,6 +263,12 @@ export async function orcamentosRoutes(app: FastifyInstance, db: Database) {
     });
 
     const result = await withTenant(db, req.user.current_tenant_id, async tx => {
+      const [cliente] = await tx.execute(sql`
+        SELECT id FROM clientes
+        WHERE id = ${body.cliente_id}::uuid AND deleted_at IS NULL AND status <> 'INATIVO'
+      `);
+      if (!cliente) throw new HttpError(400, 'INVALID_CUSTOMER', 'Selecione um cliente ativo desta empresa.');
+
       // Calcula total geral aplicando desconto percentual sobre a soma das medidas de cada item
       const totalGeral = roundCurrency(normalizedItens.reduce((total, item) => total + item.total, 0));
       const hasPrazoEntrega = await hasColumn(tx, 'orcamentos', 'prazo_entrega');
@@ -408,7 +415,10 @@ export async function orcamentosRoutes(app: FastifyInstance, db: Database) {
       if(!['RASCUNHO','ENVIADO','VISUALIZADO'].includes(String(quote.status))) throw new HttpError(409,'INVALID_STATUS','Este orçamento não pode mais ser aprovado.');
       if(quote.validade&&new Date(String(quote.validade)).getTime()<Date.now()-86_400_000) throw new HttpError(409,'QUOTE_EXPIRED','Este orçamento está vencido e não pode ser aprovado.');
       const quoteTipo = String(quote.tipo ?? 'SERVICO');
-      if(quoteTipo==='LOCACAO'&&!body.locacao) throw new HttpError(400,'RENTAL_DATES_REQUIRED','Informe o período de locação para aprovar este orçamento.');
+      const rentalStartDate = body.locacao?.data_inicio ?? new Date().toISOString().slice(0, 10);
+      const rentalEndDate = body.locacao?.data_fim_prevista ?? null;
+      const nextBillingDate = addMonthsClamped(rentalStartDate, 1);
+      const hasAutoRenewal = await hasColumn(tx, 'contratos_locacao', 'proximo_vencimento');
 
       const hasAprovadoEm = await hasColumn(tx, 'orcamentos', 'aprovado_em');
       const hasMotivoReprovacao = await hasColumn(tx, 'orcamentos', 'motivo_reprovacao');
@@ -418,14 +428,16 @@ export async function orcamentosRoutes(app: FastifyInstance, db: Database) {
           ? await tx.execute(sql`update orcamentos set status='APROVADO',aprovado_em=now() where tenant_id=${req.user.current_tenant_id}::uuid and id=${id}::uuid returning *`)
           : await tx.execute(sql`update orcamentos set status='APROVADO' where tenant_id=${req.user.current_tenant_id}::uuid and id=${id}::uuid returning *`);
 
-      const dueDate=body.locacao?.data_inicio??(quote.validade?String(quote.validade).slice(0,10):new Date().toISOString().slice(0,10));
+      const dueDate=quoteTipo==='LOCACAO'?rentalStartDate:(quote.validade?String(quote.validade).slice(0,10):new Date().toISOString().slice(0,10));
       const [conta]=hasFinOrcamentoId
         ? await tx.execute(sql`insert into transacoes_financeiras(tenant_id,tipo,descricao,valor,data_competencia,data_vencimento,status,categoria,cliente_id,orcamento_id) values(${req.user.current_tenant_id}::uuid,'RECEITA',${`Orçamento #${quote.numero??id} aprovado`},${quote.valor_total},current_date,${dueDate}::date,'PENDENTE','Venda',${quote.cliente_id}::uuid,${id}::uuid) returning id`)
         : await tx.execute(sql`insert into transacoes_financeiras(tenant_id,tipo,descricao,valor,data_competencia,data_vencimento,status,categoria,cliente_id,anexos) values(${req.user.current_tenant_id}::uuid,'RECEITA',${`Orçamento #${quote.numero??id} aprovado`},${quote.valor_total},current_date,${dueDate}::date,'PENDENTE','Venda',${quote.cliente_id}::uuid,${JSON.stringify({orcamento_id:id,tipo_origem:'ORCAMENTO'})}::jsonb) returning id`);
 
       let contratoId:string|null=null,cardId:string|null=null;
       if(quoteTipo==='LOCACAO') {
-        const [contract]=await tx.execute(sql`insert into contratos_locacao(tenant_id,cliente_id,data_inicio,data_fim_prevista,valor_total,condicao_pagamento,status) values(${req.user.current_tenant_id}::uuid,${quote.cliente_id}::uuid,${body.locacao!.data_inicio}::date,${body.locacao!.data_fim_prevista}::date,${quote.valor_total},coalesce(${quote.condicoes_pagamento},'A definir'),'ATIVO') returning id`);
+        const [contract] = hasAutoRenewal
+          ? await tx.execute(sql`insert into contratos_locacao(tenant_id,cliente_id,data_inicio,data_fim_prevista,renovacao_automatica,ciclos_cobrados,proximo_vencimento,valor_total,condicao_pagamento,status) values(${req.user.current_tenant_id}::uuid,${quote.cliente_id}::uuid,${rentalStartDate}::date,${rentalEndDate ? sql`${rentalEndDate}::date` : null},true,1,${nextBillingDate}::date,${quote.valor_total},coalesce(${quote.condicoes_pagamento},'A definir'),'ATIVO') returning id`)
+          : await tx.execute(sql`insert into contratos_locacao(tenant_id,cliente_id,data_inicio,data_fim_prevista,valor_total,condicao_pagamento,status) values(${req.user.current_tenant_id}::uuid,${quote.cliente_id}::uuid,${rentalStartDate}::date,${rentalEndDate ? sql`${rentalEndDate}::date` : null},${quote.valor_total},coalesce(${quote.condicoes_pagamento},'A definir'),'ATIVO') returning id`);
         contratoId=String(contract.id);
       } else {
         const start=await ensureProductionStart(tx,req.user.current_tenant_id);

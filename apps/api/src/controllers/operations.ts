@@ -26,9 +26,9 @@ export async function operationsRoutes(app: FastifyInstance, db: Database) {
     return ok({
       id: req.user.current_tenant_id,
       segmento: row?.segmento,
-      nome_fantasia: s.nome_fantasia || row?.nome_fantasia,
-      razao_social: s.razao_social || row?.razao_social,
-      cnpj: s.cnpj || row?.cnpj,
+      nome_fantasia: row?.nome_fantasia || s.nome_fantasia,
+      razao_social: row?.razao_social || s.razao_social,
+      cnpj: row?.cnpj || s.cnpj,
       telefone: row?.telefone ?? s.telefone ?? '',
       email: row?.email ?? s.email ?? '',
       inscricao_estadual: row?.inscricao_estadual ?? s.inscricao_estadual ?? '',

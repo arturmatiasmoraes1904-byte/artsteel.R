@@ -23,16 +23,20 @@ CREATE TABLE clientes (
 CREATE TABLE equipamentos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id uuid NOT NULL REFERENCES tenants(id), nome text NOT NULL,
   numero_patrimonio text NOT NULL, numero_serie text, categoria text NOT NULL,
+  modelo text, criticidade text NOT NULL DEFAULT 'Média', data_aquisicao date, localizacao text,
   status text NOT NULL DEFAULT 'DISPONIVEL' CHECK (status IN ('DISPONIVEL','LOCADO','MANUTENCAO','INATIVO')),
   horimetro_atual numeric(14,2) NOT NULL DEFAULT 0 CHECK (horimetro_atual>=0),
   valor_diaria numeric(14,2) NOT NULL CHECK (valor_diaria>=0), valor_reposicao numeric(14,2) NOT NULL DEFAULT 0 CHECK (valor_reposicao>=0),
+  deleted_at timestamptz,
   UNIQUE(tenant_id,id), UNIQUE(tenant_id,numero_patrimonio)
 );
 CREATE TABLE contratos_locacao (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id uuid NOT NULL REFERENCES tenants(id), cliente_id uuid NOT NULL,
-  data_inicio date NOT NULL, data_fim_prevista date NOT NULL CHECK (data_fim_prevista>=data_inicio),
+  data_inicio date NOT NULL, data_fim_prevista date,
+  renovacao_automatica boolean NOT NULL DEFAULT true, ciclos_cobrados integer NOT NULL DEFAULT 1, proximo_vencimento date,
   status text NOT NULL DEFAULT 'ATIVO' CHECK (status IN ('RASCUNHO','ATIVO','ENCERRADO','CANCELADO')),
   valor_total numeric(14,2) NOT NULL CHECK (valor_total>=0), condicao_pagamento text NOT NULL, deleted_at timestamptz,
+  CONSTRAINT contratos_locacao_datas_check CHECK (data_fim_prevista IS NULL OR data_fim_prevista>=data_inicio),
   UNIQUE(tenant_id,id), FOREIGN KEY(tenant_id,cliente_id) REFERENCES clientes(tenant_id,id)
 );
 CREATE TABLE itens_contrato (
@@ -120,6 +124,8 @@ CREATE INDEX ON equipamentos(tenant_id,status);
 CREATE INDEX ON faturas(tenant_id,data_vencimento);
 CREATE INDEX ON ordens_servico_serralheria(tenant_id,status_etapa);
 CREATE INDEX ON transacoes_financeiras(tenant_id,data_vencimento,status);
+CREATE INDEX ON transacoes_financeiras(tenant_id,tipo,status,data_vencimento ASC) WHERE deleted_at IS NULL;
+CREATE INDEX ON contratos_locacao(tenant_id,proximo_vencimento) WHERE deleted_at IS NULL AND status='ATIVO' AND renovacao_automatica=true;
 CREATE INDEX ON financeiro_pagamentos(tenant_id,transacao_id,registrado_em);
 
 CREATE FUNCTION current_tenant_id() RETURNS uuid LANGUAGE sql STABLE AS $$

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Search, Plus, Filter, X, Users, Mail, Phone, MapPin, Building2, CheckCircle2, Trash2, Clock, UserCircle, FileText, ExternalLink, Package, Calendar, AlertCircle, Loader2, Sparkles } from 'lucide-react';
@@ -12,6 +12,7 @@ import { documentoMask, isValidCnpj, isValidCpf, isValidDocumento } from '@/lib/
 import { queryKeys } from '@/lib/queryKeys';
 import { useOptimisticMutation } from '@/hooks/useOptimisticMutation';
 import { useTenantStore } from '@/stores/useTenantStore';
+import { useFormDraft } from '@/hooks/useFormDraft';
 
 type Endereco = {
   cep?: string;
@@ -72,7 +73,7 @@ type ContratoLocacao = {
   id: string;
   status: 'RASCUNHO' | 'ATIVO' | 'ENCERRADO' | 'CANCELADO';
   data_inicio: string;
-  data_fim_prevista: string;
+  data_fim_prevista?: string | null;
   valor_total: string | number;
   condicao_pagamento?: string;
   periodicidade?: string;
@@ -126,6 +127,9 @@ export default function ClientesPage() {
   const setLimit=(value:number)=>{const next=new URLSearchParams(params.toString());next.set('limit',String(value));next.set('page','1');router.replace(`/clientes?${next}`)};
   const [clienteAberto, setClienteAberto] = useState<Cliente | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const clienteFormRef = useRef<HTMLFormElement>(null);
+  const { loadDraft, saveDraft, clearDraft, hasDraft } = useFormDraft<Record<string, string>>(`cliente:${activeTenant?.id ?? 'default'}`, isCreating && !clienteAberto);
+  const DRAFT_FIELDS = ['nome', 'email', 'status', 'rua', 'numero', 'complemento', 'bairro', 'cidade', 'uf'] as const;
   const [documento, setDocumento] = useState('');
   const [telefone, setTelefone] = useState('');
   const [cep, setCep] = useState('');
@@ -136,12 +140,52 @@ export default function ClientesPage() {
   const documentoValido = documentoCompleto && isValidDocumento(documento);
   const isCnpjValido = documentoDigits.length === 14 && isValidCnpj(documentoDigits);
 
+  const syncDraft = (overrides?: Partial<Record<'documento' | 'telefone' | 'cep', string>>) => {
+    if (!isCreating || clienteAberto || !clienteFormRef.current) return;
+    const data = new FormData(clienteFormRef.current);
+    const next: Record<string, string> = {
+      documento: overrides?.documento ?? documento,
+      telefone: overrides?.telefone ?? telefone,
+      cep: overrides?.cep ?? cep,
+    };
+    for (const field of DRAFT_FIELDS) {
+      next[field] = String(data.get(field) ?? '');
+    }
+    saveDraft(next);
+  };
+
+  const resetCreateDraft = () => {
+    clearDraft();
+    setDocumento('');
+    setTelefone('');
+    setCep('');
+    setDadosCnpj(null);
+    clienteFormRef.current?.reset();
+  };
+
   useEffect(() => {
+    if (isCreating && !clienteAberto) {
+      const draft = loadDraft();
+      setDocumento(draft?.documento ?? '');
+      setTelefone(draft?.telefone ?? '');
+      setCep(draft?.cep ?? '');
+      setDadosCnpj(null);
+      requestAnimationFrame(() => {
+        if (!clienteFormRef.current) return;
+        clienteFormRef.current.reset();
+        if (!draft) return;
+        for (const field of DRAFT_FIELDS) {
+          const el = clienteFormRef.current.elements.namedItem(field) as HTMLInputElement | HTMLSelectElement | null;
+          if (el && draft[field] !== undefined) el.value = draft[field];
+        }
+      });
+      return;
+    }
     setDocumento(clienteAberto?.documento ?? '');
     setTelefone(clienteAberto?.telefone ?? '');
     setCep((clienteAberto?.endereco as Endereco)?.cep ?? '');
     setDadosCnpj(null);
-  }, [clienteAberto, isCreating]);
+  }, [clienteAberto, isCreating, activeTenant?.id]);
 
   useEffect(() => {
     if (params.get('novo') !== '1') return;
@@ -215,6 +259,7 @@ export default function ClientesPage() {
     },
     onSuccessData: (saved, variables) => {
       updateAllClientCaches(variables.tempId, () => saved);
+      clearDraft();
       setIsCreating(false);
       toast.success('Cliente cadastrado com sucesso!');
     },
@@ -260,10 +305,6 @@ export default function ClientesPage() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const documentoForm = String(formData.get('documento') ?? '');
-    if (documentoForm && !isValidDocumento(documentoForm)) {
-      toast.error('Informe um CPF ou CNPJ válido.');
-      return;
-    }
     
     // Constrói o objeto de endereço
     const endereco = {
@@ -498,19 +539,19 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#141414] text-white p-8 animate-in fade-in duration-300 relative">
+    <div className="flex flex-col h-full bg-[#121316] text-white p-8 animate-in fade-in duration-300 relative">
       {/* HEADER & TOOLBAR */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-3">
-            <Users className="text-[#b0fb5d]" size={28} />
+            <Users className="text-[#E4E7EC]" size={28} />
             Clientes
           </h1>
           <p className="text-sm text-gray-500 mt-1">Gerencie sua carteira de contatos ({clientes.length} registros)</p>
         </div>
         <button 
           onClick={() => { setClienteAberto(null); setIsCreating(true); }}
-          className="bg-[#b0fb5d] text-black px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-[#9de44f] transition-all shadow-[0_0_15px_rgba(176,251,93,0.2)]"
+          className="bg-[#E4E7EC] text-[#121316] px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-[#D4D8DF] transition-all shadow-[0_0_15px_rgba(228,231,236,0.14)]"
         >
           <Plus size={18} /> Novo Cliente
         </button>
@@ -523,33 +564,33 @@ export default function ClientesPage() {
             <input
               value={buscaInput}
               onChange={(e) => setBuscaInput(e.target.value)}
-              className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg pl-14 pr-4 py-2.5 text-sm focus:ring-1 focus:ring-[#b0fb5d] outline-none transition-all placeholder:text-gray-600"
+              className="w-full bg-[#1A1C20] border border-[#2E3238] rounded-lg pl-14 pr-4 py-2.5 text-sm focus:ring-1 focus:ring-[#E4E7EC] outline-none transition-all placeholder:text-gray-600"
               placeholder="Buscar por nome, e-mail ou documento..."
               aria-label="Buscar clientes"
             />
           </form>
         </div>
-        <button type="button" onClick={() => setFiltrosAbertos((open) => !open)} aria-expanded={filtrosAbertos} className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-sm text-gray-400 hover:text-white transition-colors whitespace-nowrap">
+        <button type="button" onClick={() => setFiltrosAbertos((open) => !open)} aria-expanded={filtrosAbertos} className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[#1A1C20] border border-[#2E3238] rounded-lg text-sm text-gray-400 hover:text-white transition-colors whitespace-nowrap">
           <Filter size={16} /> Filtros
         </button>
       </div>
       {filtrosAbertos && (
-        <div className="flex items-center gap-3 mb-6 rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] p-3">
+        <div className="flex items-center gap-3 mb-6 rounded-lg border border-[#2E3238] bg-[#1A1C20] p-3">
           <label htmlFor="cliente-status" className="text-sm text-gray-400">Status</label>
-          <select id="cliente-status" value={statusFiltro} onChange={(event) => setStatusFiltro(event.target.value)} className="bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]">
+          <select id="cliente-status" value={statusFiltro} onChange={(event) => setStatusFiltro(event.target.value)} className="bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]">
             <option value="TODOS">Todos ativos</option>
             <option value="ATIVO">Ativos</option>
-            <option value="PROSPECT">Prospects</option>
+            <option value="PROSPECT">Em negociação</option>
           </select>
-          {(busca || statusFiltro !== 'TODOS') && <button type="button" onClick={() => { setBuscaInput(''); aplicarBusca('', 'TODOS'); }} className="text-sm text-[#b0fb5d] hover:underline">Limpar filtros</button>}
+          {(busca || statusFiltro !== 'TODOS') && <button type="button" onClick={() => { setBuscaInput(''); aplicarBusca('', 'TODOS'); }} className="text-sm text-[#E4E7EC] hover:underline">Limpar filtros</button>}
         </div>
       )}
 
       {/* DATA TABLE */}
-      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden flex-1 flex flex-col">
+      <div className="bg-[#1A1C20] border border-[#2E3238] rounded-xl overflow-hidden flex-1 flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-[#242424] text-gray-400 border-b border-[#2a2a2a]">
+            <thead className="bg-[#23262B] text-gray-400 border-b border-[#2E3238]">
               <tr>
                 <th className="p-4 font-medium">Nome / Empresa</th>
                 <th className="p-4 font-medium">Documento</th>
@@ -558,11 +599,11 @@ export default function ClientesPage() {
                 <th className="p-4 font-medium text-right">Cadastrado em</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#2a2a2a]">
+            <tbody className="divide-y divide-[#2E3238]">
               {isLoading ? (
                 Array.from({ length: 5 }, (_, index) => (
                   <tr key={`skeleton-${index}`} aria-hidden="true">
-                    {Array.from({ length: 5 }, (_, cell) => <td key={cell} className="p-4"><div className="h-4 rounded bg-[#2a2a2a] animate-pulse" /></td>)}
+                    {Array.from({ length: 5 }, (_, cell) => <td key={cell} className="p-4"><div className="h-4 rounded bg-[#2E3238] animate-pulse" /></td>)}
                   </tr>
                 ))
               ) : clientes.length === 0 ? (
@@ -578,11 +619,11 @@ export default function ClientesPage() {
                 clientes.map((c) => (
                   <tr 
                     key={c.id} 
-                    className="hover:bg-[#242424]/50 transition-colors cursor-pointer group" 
+                    className="hover:bg-[#23262B]/50 transition-colors cursor-pointer group" 
                     onClick={() => { setIsCreating(false); setClienteAberto(c); }}
                   >
                     <td className="p-4">
-                      <div className="font-semibold text-white group-hover:text-[#b0fb5d] transition-colors">{c.nome}</div>
+                      <div className="font-semibold text-white group-hover:text-[#E4E7EC] transition-colors">{c.nome}</div>
                     </td>
                     <td className="p-4 text-gray-400">
                       {c.documento ? c.documento : <span className="text-gray-600">-</span>}
@@ -596,7 +637,7 @@ export default function ClientesPage() {
                     </td>
                     <td className="p-4">
                       {c.status === 'ATIVO' ? (
-                        <span className="bg-[#b0fb5d]/10 text-[#b0fb5d] px-2.5 py-1 rounded-md text-xs font-medium border border-[#b0fb5d]/20 inline-flex items-center gap-1.5">
+                        <span className="bg-[#E4E7EC]/10 text-[#E4E7EC] px-2.5 py-1 rounded-md text-xs font-medium border border-[#E4E7EC]/20 inline-flex items-center gap-1.5">
                           <CheckCircle2 size={12}/> Ativo
                         </span>
                       ) : (
@@ -627,15 +668,15 @@ export default function ClientesPage() {
           />
           
           {/* Painel (Sheet) */}
-          <div className="relative w-full max-w-lg bg-[#1a1a1a] border-l border-[#2a2a2a] shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-300">
+          <div className="relative w-full max-w-lg bg-[#1A1C20] border-l border-[#2E3238] shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-300">
             {/* Header da Gaveta */}
-            <div className="flex items-center justify-between p-6 border-b border-[#2a2a2a] bg-[#141414]">
+            <div className="flex items-center justify-between p-6 border-b border-[#2E3238] bg-[#121316]">
               <h2 className="text-xl font-bold flex items-center gap-2">
-                {isCreating ? <><UserCircle className="text-[#b0fb5d]"/> Novo Cadastro</> : <><Building2 className="text-[#b0fb5d]"/> Editar Cliente</>}
+                {isCreating ? <><UserCircle className="text-[#E4E7EC]"/> Novo Cadastro</> : <><Building2 className="text-[#E4E7EC]"/> Editar Cliente</>}
               </h2>
               <button 
                 onClick={() => { setClienteAberto(null); setIsCreating(false); }} 
-                className="p-2 text-gray-500 hover:text-white hover:bg-[#2a2a2a] rounded-full transition-colors"
+                className="p-2 text-gray-500 hover:text-white hover:bg-[#2E3238] rounded-full transition-colors"
               >
                 <X size={20} />
               </button>
@@ -643,11 +684,11 @@ export default function ClientesPage() {
 
             {/* Formulário Scrollável */}
             <div className="flex-1 overflow-y-auto no-scrollbar p-6">
-              <form id="cliente-form" onSubmit={handleSubmit} className="space-y-8">
+              <form id="cliente-form" ref={clienteFormRef} noValidate onInput={() => syncDraft()} onChange={() => syncDraft()} onSubmit={handleSubmit} className="space-y-8">
                 
                 {/* Bloco: Dados Principais */}
                 <section>
-                  <h3 className="text-sm font-bold text-[#b0fb5d] uppercase tracking-wider mb-4 border-b border-[#2a2a2a] pb-2">Identificação</h3>
+                  <h3 className="text-sm font-bold text-[#E4E7EC] uppercase tracking-wider mb-4 border-b border-[#2E3238] pb-2">Identificação</h3>
                   <div className="space-y-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">Documento (CPF / CNPJ)</label>
@@ -656,16 +697,16 @@ export default function ClientesPage() {
                           name="documento"
                           mask={documentoMask(documento)}
                           value={documento}
-                          onAccept={(value) => setDocumento(String(value))}
+                          onAccept={(value) => { const next = String(value); setDocumento(next); syncDraft({ documento: next }); }}
                           placeholder="Digite o CPF (11 dígitos) ou CNPJ (14 dígitos)..."
-                          className={`flex-1 bg-[#242424] border rounded-lg px-4 py-2.5 text-sm text-white outline-none ${documentoValido?'border-green-500 focus:ring-1 focus:ring-green-500':documentoCompleto?'border-red-500 focus:ring-1 focus:ring-red-500':'border-[#2a2a2a] focus:ring-1 focus:ring-[#b0fb5d]'}`}
+                          className={`flex-1 bg-[#23262B] border rounded-lg px-4 py-2.5 text-sm text-white outline-none ${documentoValido?'border-green-500 focus:ring-1 focus:ring-green-500':documentoCompleto?'border-red-500 focus:ring-1 focus:ring-red-500':'border-[#2E3238] focus:ring-1 focus:ring-[#E4E7EC]'}`}
                         />
                         <button
                           type="button"
                           onClick={consultarDocumento}
                           disabled={consultandoCnpj}
                           title="Consultar dados por CNPJ ou CPF"
-                          className="px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 bg-[#b0fb5d] text-black hover:bg-[#9de44f] transition-all disabled:opacity-50 whitespace-nowrap shadow-[0_0_12px_rgba(176,251,93,0.15)]"
+                          className="px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 bg-[#E4E7EC] text-[#121316] hover:bg-[#D4D8DF] transition-all disabled:opacity-50 whitespace-nowrap shadow-[0_0_12px_rgba(228,231,236,0.14)]"
                         >
                           {consultandoCnpj ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
                           {consultandoCnpj ? 'Consultando...' : 'Consultar CNPJ/CPF'}
@@ -683,9 +724,9 @@ export default function ClientesPage() {
                     </div>
 
                     {dadosCnpj && (
-                      <div className="rounded-xl border border-[#b0fb5d]/30 bg-[#b0fb5d]/5 p-4 space-y-2.5 text-xs">
+                      <div className="rounded-xl border border-[#E4E7EC]/30 bg-[#E4E7EC]/5 p-4 space-y-2.5 text-xs">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-[#b0fb5d] uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="font-bold text-[#E4E7EC] uppercase tracking-wider flex items-center gap-1.5">
                             <Building2 size={14} /> {dadosCnpj.fonte === 'validacao_cpf' || dadosCnpj.fonte === 'cadastro_interno' ? 'Resultado da Consulta (CPF)' : 'Dados Empresariais Encontrados'}
                           </span>
                           <div className="flex items-center gap-1.5">
@@ -708,7 +749,7 @@ export default function ClientesPage() {
                               <strong className="text-white">{dadosCnpj.razao_social}</strong>
                             </div>
                             {dadosCnpj.nome_fantasia && (
-                              <div className="sm:col-span-2 flex items-center justify-between gap-2 bg-[#1a1a1a]/80 p-2 rounded border border-[#2a2a2a]">
+                              <div className="sm:col-span-2 flex items-center justify-between gap-2 bg-[#1A1C20]/80 p-2 rounded border border-[#2E3238]">
                                 <div>
                                   <span className="text-gray-500 block text-[11px]">Nome Fantasia:</span>
                                   <strong className="text-white">{dadosCnpj.nome_fantasia}</strong>
@@ -720,7 +761,7 @@ export default function ClientesPage() {
                                     const input = form?.elements.namedItem('nome') as HTMLInputElement | null;
                                     if (input && dadosCnpj.nome_fantasia) input.value = dadosCnpj.nome_fantasia;
                                   }}
-                                  className="px-2.5 py-1 rounded bg-[#242424] hover:bg-[#b0fb5d] hover:text-black text-[#b0fb5d] border border-[#b0fb5d]/30 text-[11px] font-semibold transition-colors"
+                                  className="px-2.5 py-1 rounded bg-[#23262B] hover:bg-[#E4E7EC] hover:text-[#121316] text-[#E4E7EC] border border-[#E4E7EC]/30 text-[11px] font-semibold transition-colors"
                                 >
                                   Usar no Nome
                                 </button>
@@ -762,63 +803,63 @@ export default function ClientesPage() {
                     )}
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1.5">Nome / Razão Social *</label>
-                      <input name="nome" defaultValue={clienteAberto?.nome} required className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#b0fb5d] outline-none" />
+                      <label className="block text-xs font-medium text-gray-400 mb-1.5">Nome / Razão Social</label>
+                      <input name="nome" defaultValue={clienteAberto?.nome} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#E4E7EC] outline-none" />
                     </div>
                   </div>
                 </section>
 
                 {/* Bloco: Contato */}
                 <section>
-                  <h3 className="text-sm font-bold text-[#b0fb5d] uppercase tracking-wider mb-4 border-b border-[#2a2a2a] pb-2">Contato</h3>
+                  <h3 className="text-sm font-bold text-[#E4E7EC] uppercase tracking-wider mb-4 border-b border-[#2E3238] pb-2">Contato</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">Celular / WhatsApp</label>
-                      <IMaskInput name="telefone" mask="(00) 00000-0000" value={telefone} onAccept={(value) => setTelefone(String(value))} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#b0fb5d] outline-none" />
+                      <IMaskInput name="telefone" mask="(00) 00000-0000" value={telefone} onAccept={(value) => { const next = String(value); setTelefone(next); syncDraft({ telefone: next }); }} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#E4E7EC] outline-none" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">E-mail Corporativo</label>
-                      <input name="email" type="email" defaultValue={clienteAberto?.email || ''} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#b0fb5d] outline-none" />
+                      <input name="email" type="text" inputMode="email" defaultValue={clienteAberto?.email || ''} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#E4E7EC] outline-none" />
                     </div>
                   </div>
                 </section>
 
                 {/* Bloco: Endereço (JSON) */}
                 <section>
-                  <h3 className="text-sm font-bold text-[#b0fb5d] uppercase tracking-wider mb-4 border-b border-[#2a2a2a] pb-2 flex items-center gap-2"><MapPin size={14}/> Endereço</h3>
+                  <h3 className="text-sm font-bold text-[#E4E7EC] uppercase tracking-wider mb-4 border-b border-[#2E3238] pb-2 flex items-center gap-2"><MapPin size={14}/> Endereço</h3>
                   <div className="space-y-4">
                     <div className="grid grid-cols-3 gap-4">
                       <div className="col-span-1">
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">CEP</label>
-                        <IMaskInput name="cep" mask="00000-000" value={cep} onAccept={(value) => setCep(String(value))} onBlur={(event) => preencherEnderecoPorCep(event.currentTarget.value, event.currentTarget.form)} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#b0fb5d] outline-none" />
+                        <IMaskInput name="cep" mask="00000-000" value={cep} onAccept={(value) => { const next = String(value); setCep(next); syncDraft({ cep: next }); }} onBlur={(event) => preencherEnderecoPorCep(event.currentTarget.value, event.currentTarget.form)} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#E4E7EC] outline-none" />
                       </div>
                       <div className="col-span-2">
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Rua / Logradouro</label>
-                        <input name="rua" defaultValue={(clienteAberto?.endereco as Endereco)?.rua || ''} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#b0fb5d] outline-none" />
+                        <input name="rua" defaultValue={(clienteAberto?.endereco as Endereco)?.rua || ''} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#E4E7EC] outline-none" />
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="col-span-1">
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Número</label>
-                        <input name="numero" defaultValue={(clienteAberto?.endereco as Endereco)?.numero || ''} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#b0fb5d] outline-none" />
+                        <input name="numero" defaultValue={(clienteAberto?.endereco as Endereco)?.numero || ''} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#E4E7EC] outline-none" />
                       </div>
                       <div className="col-span-2">
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Complemento</label>
-                        <input name="complemento" defaultValue={(clienteAberto?.endereco as Endereco)?.complemento || ''} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#b0fb5d] outline-none" />
+                        <input name="complemento" defaultValue={(clienteAberto?.endereco as Endereco)?.complemento || ''} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#E4E7EC] outline-none" />
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="col-span-1">
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Bairro</label>
-                        <input name="bairro" defaultValue={(clienteAberto?.endereco as Endereco)?.bairro || ''} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#b0fb5d] outline-none" />
+                        <input name="bairro" defaultValue={(clienteAberto?.endereco as Endereco)?.bairro || ''} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#E4E7EC] outline-none" />
                       </div>
                       <div className="col-span-1">
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Cidade</label>
-                        <input name="cidade" defaultValue={(clienteAberto?.endereco as Endereco)?.cidade || ''} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#b0fb5d] outline-none" />
+                        <input name="cidade" defaultValue={(clienteAberto?.endereco as Endereco)?.cidade || ''} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#E4E7EC] outline-none" />
                       </div>
                       <div className="col-span-1">
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">UF</label>
-                        <input name="uf" defaultValue={(clienteAberto?.endereco as Endereco)?.uf || ''} maxLength={2} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#b0fb5d] outline-none uppercase" />
+                        <input name="uf" defaultValue={(clienteAberto?.endereco as Endereco)?.uf || ''} maxLength={2} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#E4E7EC] outline-none uppercase" />
                       </div>
                     </div>
                   </div>
@@ -826,26 +867,26 @@ export default function ClientesPage() {
 
                 {/* Bloco: Comercial */}
                 <section>
-                  <h3 className="text-sm font-bold text-[#b0fb5d] uppercase tracking-wider mb-4 border-b border-[#2a2a2a] pb-2">Comercial</h3>
+                  <h3 className="text-sm font-bold text-[#E4E7EC] uppercase tracking-wider mb-4 border-b border-[#2E3238] pb-2">Comercial</h3>
                   <div>
                     <label className="block text-xs font-medium text-gray-400 mb-1.5">Status da Conta</label>
-                    <select name="status" defaultValue={clienteAberto?.status || 'ATIVO'} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#b0fb5d] outline-none appearance-none">
+                    <select name="status" defaultValue={clienteAberto?.status || 'ATIVO'} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-[#E4E7EC] outline-none appearance-none">
                       <option value="ATIVO">Ativo</option>
                       <option value="INATIVO">Inativo</option>
-                      <option value="PROSPECT">Prospect (Aguardando Aprovação)</option>
+                      <option value="PROSPECT">Em negociação</option>
                     </select>
                   </div>
                 </section>
 
                 {!isCreating && clienteAberto && (
                   <section className="space-y-4">
-                    <div className="flex items-center justify-between border-b border-[#2a2a2a] pb-2">
-                      <h3 className="text-sm font-bold text-[#b0fb5d] uppercase tracking-wider flex items-center gap-2">
+                    <div className="flex items-center justify-between border-b border-[#2E3238] pb-2">
+                      <h3 className="text-sm font-bold text-[#E4E7EC] uppercase tracking-wider flex items-center gap-2">
                         <FileText size={16} /> Contratos Vinculados {clienteContratos.length > 0 ? `(${clienteContratos.length})` : ''}
                       </h3>
                       <Link 
                         href="/locacao/contratos" 
-                        className="text-xs text-gray-400 hover:text-[#b0fb5d] flex items-center gap-1 transition-colors group"
+                        className="text-xs text-gray-400 hover:text-[#E4E7EC] flex items-center gap-1 transition-colors group"
                       >
                         Ver todos <ExternalLink size={12} className="group-hover:translate-x-0.5 transition-transform" />
                       </Link>
@@ -853,7 +894,7 @@ export default function ClientesPage() {
 
                     {clienteContratosQuery.isLoading ? (
                       <div className="flex items-center justify-center p-6 text-sm text-gray-500 gap-2">
-                        <div className="w-4 h-4 border-2 border-[#b0fb5d] border-t-transparent rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-[#E4E7EC] border-t-transparent rounded-full animate-spin" />
                         Carregando contratos vinculados...
                       </div>
                     ) : clienteContratosQuery.isError ? (
@@ -862,13 +903,13 @@ export default function ClientesPage() {
                         Não foi possível carregar os contratos deste cliente.
                       </div>
                     ) : clienteContratos.length === 0 ? (
-                      <div className="text-center py-6 px-4 bg-[#242424]/40 border border-dashed border-[#2a2a2a] rounded-lg">
+                      <div className="text-center py-6 px-4 bg-[#23262B]/40 border border-dashed border-[#2E3238] rounded-lg">
                         <FileText size={32} className="mx-auto text-gray-600 mb-2" />
                         <p className="text-xs text-gray-400 font-medium">Nenhum contrato vinculado a este cliente</p>
                         <p className="text-[11px] text-gray-500 mt-1">Os contratos emitidos para este cliente aparecerão aqui.</p>
                         <Link 
                           href="/locacao/contratos" 
-                          className="inline-flex items-center gap-1.5 mt-3 text-xs font-semibold text-[#b0fb5d] hover:underline"
+                          className="inline-flex items-center gap-1.5 mt-3 text-xs font-semibold text-[#E4E7EC] hover:underline"
                         >
                           <Plus size={14} /> Novo Contrato
                         </Link>
@@ -878,7 +919,7 @@ export default function ClientesPage() {
                         {clienteContratos.map((contrato) => (
                           <div 
                             key={contrato.id} 
-                            className="rounded-lg border border-[#2a2a2a] bg-[#242424] hover:border-[#3a3a3a] transition-all p-4 space-y-3"
+                            className="rounded-lg border border-[#2E3238] bg-[#23262B] hover:border-[#2E3238] transition-all p-4 space-y-3"
                           >
                             <div className="flex items-center justify-between gap-3">
                               <div className="flex items-center gap-2">
@@ -893,7 +934,7 @@ export default function ClientesPage() {
                               </div>
                               <span className={`rounded-md px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                                 contrato.status === 'ATIVO' 
-                                  ? 'bg-[#b0fb5d]/10 text-[#b0fb5d] border border-[#b0fb5d]/20' 
+                                  ? 'bg-[#E4E7EC]/10 text-[#E4E7EC] border border-[#E4E7EC]/20' 
                                   : contrato.status === 'ENCERRADO'
                                   ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                   : contrato.status === 'CANCELADO'
@@ -904,7 +945,7 @@ export default function ClientesPage() {
                               </span>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 text-xs text-gray-400 bg-[#1e1e1e] p-2.5 rounded border border-[#2a2a2a]">
+                            <div className="grid grid-cols-2 gap-2 text-xs text-gray-400 bg-[#23262B] p-2.5 rounded border border-[#2E3238]">
                               <div>
                                 <span className="text-gray-500 text-[11px] block">Início:</span>
                                 <strong className="text-gray-200">
@@ -912,14 +953,14 @@ export default function ClientesPage() {
                                 </strong>
                               </div>
                               <div>
-                                <span className="text-gray-500 text-[11px] block">Fim / Devolução:</span>
+                                <span className="text-gray-500 text-[11px] block">Vigência:</span>
                                 <strong className="text-gray-200">
-                                  {contrato.data_fim_prevista ? new Date(contrato.data_fim_prevista).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—'}
+                                  {contrato.data_fim_prevista ? new Date(contrato.data_fim_prevista).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Renovação mensal automática'}
                                 </strong>
                               </div>
                               <div>
                                 <span className="text-gray-500 text-[11px] block">Valor Total:</span>
-                                <strong className="text-[#b0fb5d] font-semibold">
+                                <strong className="text-[#E4E7EC] font-semibold">
                                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(contrato.valor_total || 0))}
                                 </strong>
                               </div>
@@ -938,9 +979,9 @@ export default function ClientesPage() {
                                 </span>
                                 <div className="space-y-1">
                                   {contrato.itens.map((it) => (
-                                    <div key={it.id} className="flex items-center justify-between text-xs bg-[#1a1a1a] px-2.5 py-1.5 rounded border border-[#2a2a2a]">
+                                    <div key={it.id} className="flex items-center justify-between text-xs bg-[#1A1C20] px-2.5 py-1.5 rounded border border-[#2E3238]">
                                       <span className="flex items-center gap-1.5 text-gray-300">
-                                        <Package size={12} className="text-[#b0fb5d]" />
+                                        <Package size={12} className="text-[#E4E7EC]" />
                                         {it.nome}
                                       </span>
                                       {it.patrimonio && (
@@ -955,7 +996,7 @@ export default function ClientesPage() {
                             )}
 
                             {contrato.observacoes && (
-                              <p className="text-[11px] text-gray-400 italic bg-[#1a1a1a] p-2 rounded border border-[#2a2a2a]">
+                              <p className="text-[11px] text-gray-400 italic bg-[#1A1C20] p-2 rounded border border-[#2E3238]">
                                 Obs: {contrato.observacoes}
                               </p>
                             )}
@@ -963,7 +1004,7 @@ export default function ClientesPage() {
                             <div className="pt-1 flex justify-end">
                               <Link 
                                 href="/locacao/contratos" 
-                                className="text-xs text-gray-400 hover:text-[#b0fb5d] flex items-center gap-1 font-medium transition-colors"
+                                className="text-xs text-gray-400 hover:text-[#E4E7EC] flex items-center gap-1 font-medium transition-colors"
                               >
                                 Abrir no módulo de contratos <ExternalLink size={12} />
                               </Link>
@@ -979,7 +1020,7 @@ export default function ClientesPage() {
             </div>
 
             {/* Footer de Ações Fixas */}
-            <div className="p-6 border-t border-[#2a2a2a] bg-[#141414] flex items-center justify-between">
+            <div className="p-6 border-t border-[#2E3238] bg-[#121316] flex items-center justify-between">
               {clienteAberto ? (
                 <button 
                   onClick={() => {
@@ -991,6 +1032,14 @@ export default function ClientesPage() {
                   type="button"
                 >
                   <Trash2 size={16} /> Excluir Cliente
+                </button>
+              ) : isCreating && hasDraft ? (
+                <button
+                  onClick={resetCreateDraft}
+                  className="text-xs font-medium text-[#9CA1AA] hover:text-[#F2F3F5] px-3 py-2 rounded-lg border border-[#2E3238] transition-colors"
+                  type="button"
+                >
+                  Limpar rascunho
                 </button>
               ) : <div></div>}
 
@@ -1006,7 +1055,7 @@ export default function ClientesPage() {
                   type="submit" 
                   form="cliente-form"
                   disabled={createMutation.isPending || updateMutation.isPending}
-                  className="bg-[#b0fb5d] text-black px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#9de44f] transition-colors disabled:opacity-50"
+                  className="bg-[#E4E7EC] text-[#121316] px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#D4D8DF] transition-colors disabled:opacity-50"
                 >
                   {createMutation.isPending || updateMutation.isPending ? 'Sincronizando…' : 'Salvar Ficha'}
                 </button>

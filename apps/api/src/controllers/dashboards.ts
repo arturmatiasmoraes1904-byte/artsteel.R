@@ -20,10 +20,12 @@ async function dashboardDetails(tx:any,scope:DashboardScope){
     ) activity order by occurred_at desc limit 8`),
     tx.execute(sql`select id,nome as name,email,telefone as phone from clientes where status <> 'INATIVO' order by id limit 5`),
     tx.execute(sql`select * from (
-      select concat('financeiro-',id) as id,'Há contas vencidas que exigem atenção.' as message,created_at as occurred_at from transacoes_financeiras where deleted_at is null and tipo='RECEITA' and status in ('PENDENTE','ATRASADO') and data_vencimento<current_date
-      union all select concat('estoque-',id) as id,concat('Estoque baixo: ',nome,'.') as message,created_at as occurred_at from produtos where deleted_at is null and status='ATIVO' and estoque_atual<=estoque_minimo
-      union all select concat('manutencao-',id) as id,concat('Equipamento em manutenção: ',nome,'.') as message,null::timestamptz as occurred_at from equipamentos where status='MANUTENCAO'
-    ) alert order by occurred_at desc nulls last limit 6`),
+      select concat('pagar-vencida-',id) as id, concat('Conta a pagar vencida (',to_char(data_vencimento,'DD/MM'),'): ',descricao,'.') as message, data_vencimento::timestamptz as occurred_at, 1 as priority from transacoes_financeiras where deleted_at is null and tipo='DESPESA' and status in ('PENDENTE','ATRASADO') and data_vencimento<current_date
+      union all select concat('pagar-proxima-',id) as id, concat('Conta a pagar vence em ',to_char(data_vencimento,'DD/MM'),': ',descricao,'.') as message, data_vencimento::timestamptz as occurred_at, 2 as priority from transacoes_financeiras where deleted_at is null and tipo='DESPESA' and status in ('PENDENTE','ATRASADO') and data_vencimento>=current_date and data_vencimento<=current_date+interval '7 days'
+      union all select concat('financeiro-',id) as id,'Há contas a receber vencidas que exigem atenção.' as message,created_at as occurred_at, 3 as priority from transacoes_financeiras where deleted_at is null and tipo='RECEITA' and status in ('PENDENTE','ATRASADO') and data_vencimento<current_date
+      union all select concat('estoque-',id) as id,concat('Estoque baixo: ',nome,'.') as message,created_at as occurred_at, 4 as priority from produtos where deleted_at is null and status='ATIVO' and estoque_atual<=estoque_minimo
+      union all select concat('manutencao-',id) as id,concat('Equipamento em manutenção: ',nome,'.') as message,null::timestamptz as occurred_at, 5 as priority from equipamentos where status='MANUTENCAO'
+    ) alert order by priority asc, occurred_at asc nulls last limit 6`),
     tx.execute(sql`select count(*)::int as total_produtos,count(*) filter(where status='ATIVO' and estoque_atual<=estoque_minimo)::int as baixo_estoque,coalesce(sum(estoque_atual*custo_medio),0)::float as valor_estoque from produtos where deleted_at is null`),
     tx.execute(sql`select count(*)::int as total, count(*) filter(where status='APROVADO')::int as aprovados, count(*) filter(where status in ('ENVIADO','VISUALIZADO'))::int as pendentes, coalesce(sum(valor_total) filter(where status in ('ENVIADO','VISUALIZADO')),0)::float as pipeline from orcamentos where deleted_at is null`),
     tx.execute(sql`select status as name,count(*)::int as quantidade from orcamentos where deleted_at is null group by status order by status`),
@@ -71,10 +73,21 @@ export async function dashboardRoutes(app:FastifyInstance,db:Database){
     const allowed=tenants.filter(t=>t.role==='ADMIN'||t.role==='FINANCEIRO');
     if(!allowed.length) throw new HttpError(403,'ROLE_DENIED','Consolidado disponível para administradores e financeiro.');
     const companies=await Promise.all(allowed.map(async tenant=>{
-      const values=await withTenant(db,String(tenant.id),async tx=>(await tx.execute(sql`select coalesce(sum(valor),0)::float as faturamento,coalesce(sum(valor) filter(where status_pagamento!='PAGO'),0)::float as recebiveis,coalesce(sum(valor) filter(where status_pagamento='PAGO'),0)::float as recebido from faturas`))[0]);
-      return {name:String(tenant.nome_fantasia),faturamento:Number(values.faturamento),recebiveis:Number(values.recebiveis),recebido:Number(values.recebido)};
+      const values=await withTenant(db,String(tenant.id),async tx=>(await tx.execute(sql`
+        select
+          coalesce(sum(valor) filter(where tipo='RECEITA'),0)::float as faturamento,
+          coalesce(sum(valor) filter(where tipo='RECEITA' and status in ('PENDENTE','ATRASADO')),0)::float as recebiveis,
+          coalesce(sum(valor) filter(where tipo='RECEITA' and status='PAGO'),0)::float as recebido,
+          coalesce(sum(valor) filter(where tipo='DESPESA'),0)::float as despesas,
+          coalesce(sum(valor) filter(where tipo='DESPESA' and status in ('PENDENTE','ATRASADO')),0)::float as despesas_pendentes
+        from transacoes_financeiras
+        where deleted_at is null
+      `))[0]);
+      return {name:String(tenant.nome_fantasia),faturamento:Number(values.faturamento),recebiveis:Number(values.recebiveis),recebido:Number(values.recebido),despesas:Number(values.despesas),despesas_pendentes:Number(values.despesas_pendentes)};
     }));
-    return ok({companies,faturamento:companies.reduce((n,c)=>n+c.faturamento,0),recebiveis:companies.reduce((n,c)=>n+c.recebiveis,0),recebido:companies.reduce((n,c)=>n+c.recebido,0),ebitda:null,fluxo_caixa_livre:null,nota:'EBITDA e fluxo de caixa livre dependem do cadastro de despesas operacionais, impostos e investimentos.'});
+    const totalFaturamento=companies.reduce((n,c)=>n+c.faturamento,0);
+    const totalDespesas=companies.reduce((n,c)=>n+c.despesas,0);
+    return ok({companies,faturamento:totalFaturamento,recebiveis:companies.reduce((n,c)=>n+c.recebiveis,0),recebido:companies.reduce((n,c)=>n+c.recebido,0),despesas:totalDespesas,despesas_pendentes:companies.reduce((n,c)=>n+c.despesas_pendentes,0),resultado_operacional:totalFaturamento-totalDespesas});
   });
 }
 

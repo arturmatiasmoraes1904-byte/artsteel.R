@@ -11,6 +11,8 @@ type State = {
   userTenants: Tenant[];
   token: string | null;
   switching: boolean;
+  hasHydrated: boolean;
+  setHasHydrated: (hydrated: boolean) => void;
   setSession: (session: Session) => void;
   switchTenant: (id: string) => Promise<void>;
   logout: () => void;
@@ -43,6 +45,8 @@ export const useTenantStore = create<State>()(persist((set, get) => ({
   userTenants: [],
   token: null,
   switching: false,
+  hasHydrated: false,
+  setHasHydrated: hydrated => set({ hasHydrated: hydrated }),
   setSession: session => set({
     ...session,
     activeTenant: canonicalizeTenant(session.activeTenant),
@@ -83,10 +87,11 @@ export const useTenantStore = create<State>()(persist((set, get) => ({
   }
 }), {
   name: 'nexo-session',
-  storage: createJSONStorage(() => sessionStorage),
+  storage: createJSONStorage(() => localStorage),
   partialize: s => ({ user: s.user, activeTenant: s.activeTenant, userTenants: s.userTenants, token: s.token }),
   onRehydrateStorage: () => (state) => {
     if (state?.activeTenant) state.activeTenant = canonicalizeTenant(state.activeTenant);
     if (state?.userTenants) state.userTenants = state.userTenants.map(t => canonicalizeTenant(t)!);
+    state?.setHasHydrated(true);
   }
 }));

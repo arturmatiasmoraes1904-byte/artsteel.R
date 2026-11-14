@@ -64,6 +64,8 @@ try {
     if (!stockPerformanceMigration.length) {await tx.unsafe(await readFile(new URL('./migrations/020_estoque_performance_indexes.sql', import.meta.url), 'utf8'));await tx`insert into schema_migrations(version) values(20)`;}
     const quoteItemUnitMigration=await tx`select version from schema_migrations where version=21`;
     if (!quoteItemUnitMigration.length) {await tx.unsafe(await readFile(new URL('./migrations/021_orcamento_itens_unidade.sql', import.meta.url), 'utf8'));await tx`insert into schema_migrations(version) values(21)`;}
+    const artsteelContratosEquipamentosMigration=await tx`select version from schema_migrations where version=22`;
+    if (!artsteelContratosEquipamentosMigration.length) {await tx.unsafe(await readFile(new URL('./migrations/022_artsteel_contratos_equipamentos.sql', import.meta.url), 'utf8'));await tx`insert into schema_migrations(version) values(22)`;}
   });
   console.log('Migração concluída.');
 } finally { await client.end(); }

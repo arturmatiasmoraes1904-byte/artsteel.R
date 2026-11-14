@@ -564,7 +564,7 @@ export default function EstoquePage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#141414] text-white p-8 animate-in fade-in duration-300 relative">
+    <div className="flex flex-col h-full bg-[#121316] text-white p-8 animate-in fade-in duration-300 relative">
       {/* Input oculto para seleção de arquivo XML */}
       <input
         ref={xmlInputRef}
@@ -578,10 +578,10 @@ export default function EstoquePage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Package className="text-[#b0fb5d]" size={28} />
-            Estoque / WMS
+            <Package className="text-[#E4E7EC]" size={28} />
+            Estoque
           </h1>
-          <div className="flex gap-6 mt-3 border-b border-[#2a2a2a] overflow-x-auto no-scrollbar">
+          <div className="flex gap-6 mt-3 border-b border-[#2E3238] overflow-x-auto no-scrollbar">
             {[
               { id: 'visao_geral', label: 'Visão Geral' },
               { id: 'produtos', label: 'Produtos' },
@@ -590,7 +590,7 @@ export default function EstoquePage() {
               <button 
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`pb-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-[#b0fb5d] text-[#b0fb5d]' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+                className={`pb-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-[#E4E7EC] text-[#E4E7EC]' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
               >
                 {tab.label}
               </button>
@@ -604,13 +604,13 @@ export default function EstoquePage() {
               setIsXmlModalOpen(true);
               xmlInputRef.current?.click();
             }}
-            className="flex items-center gap-2 text-sm px-4 py-2.5 bg-[#242424] border border-[#2a2a2a] text-gray-200 font-semibold rounded-lg hover:bg-[#2a2a2a] hover:text-white transition-all"
+            className="flex items-center gap-2 text-sm px-4 py-2.5 bg-[#23262B] border border-[#2E3238] text-gray-200 font-semibold rounded-lg hover:bg-[#2E3238] hover:text-white transition-all"
           >
-            <Upload size={16} className="text-[#b0fb5d]" /> Importar XML
+            <Upload size={16} className="text-[#E4E7EC]" /> Importar XML
           </button>
           <button 
             onClick={() => { setProdutoAberto(null); setIsCreatingProduto(true); }}
-            className="flex items-center gap-2 text-sm px-5 py-2.5 bg-[#b0fb5d] text-black font-bold rounded-lg shadow-[0_0_15px_rgba(176,251,93,0.2)] hover:bg-[#9de44f] transition-all"
+            className="flex items-center gap-2 text-sm px-5 py-2.5 bg-[#E4E7EC] text-[#121316] font-bold rounded-lg shadow-[0_0_15px_rgba(228,231,236,0.14)] hover:bg-[#D4D8DF] transition-all"
           >
             <Plus size={16}/> Novo Produto
           </button>
@@ -621,19 +621,19 @@ export default function EstoquePage() {
         <div className="space-y-6">
           {/* KPIs DASHBOARD */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-5 rounded-xl">
+            <div className="bg-[#1A1C20] border border-[#2E3238] p-5 rounded-xl">
               <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Produtos Cadastrados</span>
               <div className="text-2xl font-bold mt-2 text-white">
                 {isLoadingDash ? '...' : dashboard?.total_produtos || 0}
               </div>
             </div>
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-5 rounded-xl border-t-2 border-t-[#b0fb5d]">
+            <div className="bg-[#1A1C20] border border-[#2E3238] p-5 rounded-xl border-t-2 border-t-[#E4E7EC]">
               <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Custo do Estoque</span>
               <div className="text-2xl font-bold mt-2 text-white">
                 {isLoadingDash ? '...' : formatCurrency(dashboard?.valor_total_custo || 0)}
               </div>
             </div>
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-5 rounded-xl border-t-2 border-t-blue-500">
+            <div className="bg-[#1A1C20] border border-[#2E3238] p-5 rounded-xl border-t-2 border-t-blue-500">
               <span className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Valor de Venda (Projeção)</span>
               <div className="text-2xl font-bold mt-2 text-white">
                 {isLoadingDash ? '...' : formatCurrency(dashboard?.valor_total_venda || 0)}
@@ -648,12 +648,12 @@ export default function EstoquePage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-6 h-64 flex flex-col items-center justify-center text-gray-500">
+            <div className="lg:col-span-2 bg-[#1A1C20] border border-[#2E3238] rounded-xl p-6 h-64 flex flex-col items-center justify-center text-gray-500">
               <BarChart3 size={40} className="mb-4 opacity-50"/>
               <p>O gráfico de movimentações semanais (Entradas x Saídas) será renderizado aqui.</p>
             </div>
-            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-6 h-64 overflow-y-auto no-scrollbar">
-              <h3 className="text-sm font-semibold mb-4 text-[#b0fb5d]">Atenção Necessária</h3>
+            <div className="bg-[#1A1C20] border border-[#2E3238] rounded-xl p-6 h-64 overflow-y-auto no-scrollbar">
+              <h3 className="text-sm font-semibold mb-4 text-[#E4E7EC]">Atenção Necessária</h3>
               <div className="space-y-3">
                 {produtosAlerta.length === 0 ? (
                   <p className="text-xs text-gray-500">Nenhum produto com estoque crítico no momento.</p>
@@ -690,14 +690,14 @@ export default function EstoquePage() {
       )}
 
       {activeTab === 'produtos' && (
-        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden flex-1 flex flex-col">
-          <div className="p-4 border-b border-[#2a2a2a] flex flex-wrap gap-4 bg-[#141414]/50 items-center">
+        <div className="bg-[#1A1C20] border border-[#2E3238] rounded-xl overflow-hidden flex-1 flex flex-col">
+          <div className="p-4 border-b border-[#2E3238] flex flex-wrap gap-4 bg-[#121316]/50 items-center">
             <div className="relative flex-1 min-w-[240px] max-w-sm">
               <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} aria-hidden="true" />
               <input 
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg pl-12 pr-4 py-2.5 text-sm focus:ring-1 focus:ring-[#b0fb5d] outline-none transition-all placeholder:text-gray-600"
+                className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg pl-12 pr-4 py-2.5 text-sm focus:ring-1 focus:ring-[#E4E7EC] outline-none transition-all placeholder:text-gray-600"
                 placeholder="Buscar por nome, SKU, código de barras..."
               />
             </div>
@@ -706,16 +706,16 @@ export default function EstoquePage() {
               <button
                 type="button"
                 onClick={() => setShowFilterMenu(prev => !prev)}
-                className={`px-4 py-2.5 bg-[#242424] border rounded-lg text-sm flex items-center gap-2 transition-colors ${
+                className={`px-4 py-2.5 bg-[#23262B] border rounded-lg text-sm flex items-center gap-2 transition-colors ${
                   filtroEstoque !== 'TODOS'
-                    ? 'border-[#b0fb5d] text-[#b0fb5d]'
-                    : 'border-[#2a2a2a] text-gray-400 hover:text-white'
+                    ? 'border-[#E4E7EC] text-[#E4E7EC]'
+                    : 'border-[#2E3238] text-gray-400 hover:text-white'
                 }`}
               >
                 <Filter size={16}/> Filtros {filtroEstoque !== 'TODOS' ? `(${filtroEstoque})` : ''}
               </button>
               {showFilterMenu && (
-                <div className="absolute left-0 mt-2 w-48 bg-[#1f1f1f] border border-[#2a2a2a] rounded-xl shadow-xl z-20 py-1">
+                <div className="absolute left-0 mt-2 w-48 bg-[#23262B] border border-[#2E3238] rounded-xl shadow-xl z-20 py-1">
                   {[
                     { id: 'TODOS', label: 'Todos os produtos' },
                     { id: 'BAIXO_ESTOQUE', label: 'Estoque baixo' },
@@ -730,8 +730,8 @@ export default function EstoquePage() {
                         setFiltroEstoque(opt.id as typeof filtroEstoque);
                         setShowFilterMenu(false);
                       }}
-                      className={`w-full text-left px-4 py-2 text-xs hover:bg-[#2a2a2a] transition-colors ${
-                        filtroEstoque === opt.id ? 'text-[#b0fb5d] font-bold' : 'text-gray-300'
+                      className={`w-full text-left px-4 py-2 text-xs hover:bg-[#2E3238] transition-colors ${
+                        filtroEstoque === opt.id ? 'text-[#E4E7EC] font-bold' : 'text-gray-300'
                       }`}
                     >
                       {opt.label}
@@ -747,15 +747,15 @@ export default function EstoquePage() {
                 setIsXmlModalOpen(true);
                 xmlInputRef.current?.click();
               }}
-              className="px-4 py-2.5 bg-[#242424] border border-[#2a2a2a] rounded-lg text-sm text-gray-300 hover:text-white hover:border-[#b0fb5d]/50 flex items-center gap-2 transition-all"
+              className="px-4 py-2.5 bg-[#23262B] border border-[#2E3238] rounded-lg text-sm text-gray-300 hover:text-white hover:border-[#E4E7EC]/50 flex items-center gap-2 transition-all"
             >
-              <Upload size={16} className="text-[#b0fb5d]" /> Importar XML
+              <Upload size={16} className="text-[#E4E7EC]" /> Importar XML
             </button>
           </div>
           
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-[#242424] text-gray-400 sticky top-0 z-10 shadow-sm border-b border-[#2a2a2a]">
+              <thead className="bg-[#23262B] text-gray-400 sticky top-0 z-10 shadow-sm border-b border-[#2E3238]">
                 <tr>
                   <th className="p-4 font-medium">Produto / SKU</th>
                   <th className="p-4 font-medium">Localização</th>
@@ -766,11 +766,11 @@ export default function EstoquePage() {
                   <th className="p-4 font-medium w-[120px]">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#2a2a2a]">
+              <tbody className="divide-y divide-[#2E3238]">
                 {isLoadingProdutos ? (
                   Array.from({ length: 5 }, (_, index) => (
                     <tr key={`skeleton-${index}`} aria-hidden="true">
-                      {Array.from({ length: 7 }, (_, cell) => <td key={cell} className="p-4"><div className="h-4 rounded bg-[#2a2a2a] animate-pulse" /></td>)}
+                      {Array.from({ length: 7 }, (_, cell) => <td key={cell} className="p-4"><div className="h-4 rounded bg-[#2E3238] animate-pulse" /></td>)}
                     </tr>
                   ))
                 ) : produtos.length === 0 ? (
@@ -783,9 +783,9 @@ export default function EstoquePage() {
                     const isZerado = estq <= 0;
 
                     return (
-                      <tr key={p.id} className="hover:bg-[#242424] transition-colors group">
+                      <tr key={p.id} className="hover:bg-[#23262B] transition-colors group">
                         <td className="p-4 cursor-pointer" onClick={() => { setIsCreatingProduto(false); setProdutoAberto(p); }}>
-                          <div className="font-semibold text-white group-hover:text-[#b0fb5d] transition-colors">{p.nome}</div>
+                          <div className="font-semibold text-white group-hover:text-[#E4E7EC] transition-colors">{p.nome}</div>
                           <div className="text-xs text-gray-500 mt-0.5">SKU: {p.sku || 'Sem SKU'} {p.ean ? ` | EAN: ${p.ean}` : ''}</div>
                         </td>
                         <td className="p-4 text-xs text-gray-400">{p.localizacao || '-'}</td>
@@ -795,7 +795,7 @@ export default function EstoquePage() {
                           </span>
                         </td>
                         <td className="p-4 text-right text-gray-400 font-mono">{formatCurrency(p.custo_medio)}</td>
-                        <td className="p-4 text-right text-[#b0fb5d] font-mono">{formatCurrency(p.preco_venda)}</td>
+                        <td className="p-4 text-right text-[#E4E7EC] font-mono">{formatCurrency(p.preco_venda)}</td>
                         <td className="p-4 text-center">
                           <span className={`px-2 py-0.5 rounded text-xs border font-medium ${p.status === 'ATIVO' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
                             {p.status}
@@ -804,7 +804,7 @@ export default function EstoquePage() {
                         <td className="p-4 text-right">
                           <button 
                             onClick={(e) => { e.stopPropagation(); setMovimentarProduto(p); }}
-                            className="text-xs bg-[#2a2a2a] hover:bg-blue-500/20 hover:text-blue-400 hover:border-blue-500/30 text-white px-3 py-1.5 rounded font-sans transition-all border border-[#2a2a2a] flex items-center gap-1.5"
+                            className="text-xs bg-[#2E3238] hover:bg-blue-500/20 hover:text-blue-400 hover:border-blue-500/30 text-white px-3 py-1.5 rounded font-sans transition-all border border-[#2E3238] flex items-center gap-1.5"
                           >
                             <ArrowRightLeft size={12}/> Movimentar
                           </button>
@@ -825,8 +825,8 @@ export default function EstoquePage() {
       )}
 
       {activeTab === 'movimentacoes' && (
-        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden flex-1 flex flex-col">
-          <div className="p-5 border-b border-[#2a2a2a] flex items-center justify-between gap-4">
+        <div className="bg-[#1A1C20] border border-[#2E3238] rounded-xl overflow-hidden flex-1 flex flex-col">
+          <div className="p-5 border-b border-[#2E3238] flex items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold text-white">Histórico de movimentações</h2>
               <p className="text-sm text-gray-500 mt-1">Entradas, saídas e ajustes registrados no estoque.</p>
@@ -834,21 +834,21 @@ export default function EstoquePage() {
             <button
               onClick={() => movementProducts[0] && setMovimentarProduto(movementProducts[0])}
               disabled={!movementProducts.length}
-              className="flex items-center gap-2 rounded-lg bg-[#b0fb5d] px-4 py-2 text-sm font-bold text-black hover:bg-[#9de44f] disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-[#E4E7EC] px-4 py-2 text-sm font-bold text-[#121316] hover:bg-[#D4D8DF] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Plus size={16}/> Nova movimentação
             </button>
           </div>
           {isLoadingMovimentacoes ? (
             <div aria-label="Carregando movimentações" className="space-y-3 p-5">
-              {Array.from({ length: 5 }, (_, index) => <div key={index} className="h-10 rounded bg-[#242424] animate-pulse" />)}
+              {Array.from({ length: 5 }, (_, index) => <div key={index} className="h-10 rounded bg-[#23262B] animate-pulse" />)}
             </div>
           ) : !movimentacoes.length ? (
             <p className="p-8 text-center text-gray-500">Nenhuma movimentação registrada.</p>
           ) : (
             <div className="overflow-x-auto flex-1">
               <table className="w-full text-left text-sm">
-                <thead className="bg-[#242424] text-gray-400">
+                <thead className="bg-[#23262B] text-gray-400">
                   <tr>
                     <th className="p-4">Data</th>
                     <th className="p-4">Produto</th>
@@ -857,9 +857,9 @@ export default function EstoquePage() {
                     <th className="p-4">Motivo / Documento</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#2a2a2a]">
+                <tbody className="divide-y divide-[#2E3238]">
                   {movimentacoes.map(m => (
-                    <tr key={m.id} className="hover:bg-[#242424]/50">
+                    <tr key={m.id} className="hover:bg-[#23262B]/50">
                       <td className="p-4 text-gray-400">{m.created_at ? new Date(m.created_at).toLocaleString('pt-BR') : '-'}</td>
                       <td className="p-4 text-white font-medium">{m.produto_nome ?? m.produto_id}</td>
                       <td className="p-4">
@@ -896,11 +896,11 @@ export default function EstoquePage() {
       {isXmlModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsXmlModalOpen(false)} />
-          <div className="relative w-full max-w-4xl bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-6 border-b border-[#2a2a2a] bg-[#141414] rounded-t-xl">
+          <div className="relative w-full max-w-4xl bg-[#1A1C20] border border-[#2E3238] rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-[#2E3238] bg-[#121316] rounded-t-xl">
               <div>
                 <h2 className="text-lg font-bold flex items-center gap-2 text-white">
-                  <FileText className="text-[#b0fb5d]" size={20} />
+                  <FileText className="text-[#E4E7EC]" size={20} />
                   Importar Produtos via XML (NF-e)
                 </h2>
                 <p className="text-xs text-gray-400 mt-1">
@@ -914,9 +914,9 @@ export default function EstoquePage() {
 
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
               {/* Barra de seleção de arquivo */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#242424] border border-dashed border-[#3a3a3a]">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#23262B] border border-dashed border-[#2E3238]">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-lg bg-[#b0fb5d]/10 text-[#b0fb5d]">
+                  <div className="p-3 rounded-lg bg-[#E4E7EC]/10 text-[#E4E7EC]">
                     <Upload size={22} />
                   </div>
                   <div>
@@ -934,14 +934,14 @@ export default function EstoquePage() {
                   <button
                     type="button"
                     onClick={handleCarregarXmlExemplo}
-                    className="px-3 py-2 rounded-lg text-xs font-medium bg-[#1a1a1a] border border-[#2a2a2a] text-gray-300 hover:text-white hover:border-gray-500 transition-colors"
+                    className="px-3 py-2 rounded-lg text-xs font-medium bg-[#1A1C20] border border-[#2E3238] text-gray-300 hover:text-white hover:border-gray-500 transition-colors"
                   >
                     Carregar XML de Exemplo
                   </button>
                   <button
                     type="button"
                     onClick={() => xmlInputRef.current?.click()}
-                    className="px-4 py-2 rounded-lg text-xs font-bold bg-[#b0fb5d] text-black hover:bg-[#9de44f] transition-colors"
+                    className="px-4 py-2 rounded-lg text-xs font-bold bg-[#E4E7EC] text-[#121316] hover:bg-[#D4D8DF] transition-colors"
                   >
                     Escolher Arquivo .XML
                   </button>
@@ -956,7 +956,7 @@ export default function EstoquePage() {
                       <input
                         value={xmlDocumento}
                         onChange={e => setXmlDocumento(e.target.value)}
-                        className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#b0fb5d]"
+                        className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#E4E7EC]"
                         placeholder="Ex: NF-e 12450"
                       />
                     </div>
@@ -965,15 +965,15 @@ export default function EstoquePage() {
                       <input
                         value={xmlFornecedor}
                         onChange={e => setXmlFornecedor(e.target.value)}
-                        className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#b0fb5d]"
+                        className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#E4E7EC]"
                         placeholder="Nome do fornecedor"
                       />
                     </div>
                   </div>
 
-                  <div className="border border-[#2a2a2a] rounded-xl overflow-hidden">
-                    <div className="bg-[#242424] px-4 py-2.5 border-b border-[#2a2a2a] flex justify-between items-center">
-                      <span className="text-xs font-bold uppercase tracking-wider text-[#b0fb5d]">
+                  <div className="border border-[#2E3238] rounded-xl overflow-hidden">
+                    <div className="bg-[#23262B] px-4 py-2.5 border-b border-[#2E3238] flex justify-between items-center">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#E4E7EC]">
                         Itens Identificados ({xmlItens.length})
                       </span>
                       <span className="text-xs text-gray-400">
@@ -982,7 +982,7 @@ export default function EstoquePage() {
                     </div>
                     <div className="overflow-x-auto max-h-72">
                       <table className="w-full text-left text-xs whitespace-nowrap">
-                        <thead className="bg-[#1f1f1f] text-gray-400 border-b border-[#2a2a2a]">
+                        <thead className="bg-[#23262B] text-gray-400 border-b border-[#2E3238]">
                           <tr>
                             <th className="p-3">Produto</th>
                             <th className="p-3">SKU</th>
@@ -993,28 +993,28 @@ export default function EstoquePage() {
                             <th className="p-3 w-12 text-center"></th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#2a2a2a]">
+                        <tbody className="divide-y divide-[#2E3238]">
                           {xmlItens.map((item, idx) => (
-                            <tr key={idx} className="hover:bg-[#242424]/60">
+                            <tr key={idx} className="hover:bg-[#23262B]/60">
                               <td className="p-2.5">
                                 <input
                                   value={item.nome}
                                   onChange={e => handleUpdateXmlItem(idx, 'nome', e.target.value)}
-                                  className="w-full min-w-[200px] bg-[#242424] border border-[#2a2a2a] rounded px-2.5 py-1.5 text-white focus:border-[#b0fb5d] outline-none"
+                                  className="w-full min-w-[200px] bg-[#23262B] border border-[#2E3238] rounded px-2.5 py-1.5 text-white focus:border-[#E4E7EC] outline-none"
                                 />
                               </td>
                               <td className="p-2.5">
                                 <input
                                   value={item.sku}
                                   onChange={e => handleUpdateXmlItem(idx, 'sku', e.target.value)}
-                                  className="w-28 bg-[#242424] border border-[#2a2a2a] rounded px-2.5 py-1.5 text-gray-300 focus:border-[#b0fb5d] outline-none"
+                                  className="w-28 bg-[#23262B] border border-[#2E3238] rounded px-2.5 py-1.5 text-gray-300 focus:border-[#E4E7EC] outline-none"
                                 />
                               </td>
                               <td className="p-2.5">
                                 <input
                                   value={item.unidade}
                                   onChange={e => handleUpdateXmlItem(idx, 'unidade', e.target.value.toUpperCase())}
-                                  className="w-16 bg-[#242424] border border-[#2a2a2a] rounded px-2 py-1.5 text-center text-gray-300 focus:border-[#b0fb5d] outline-none"
+                                  className="w-16 bg-[#23262B] border border-[#2E3238] rounded px-2 py-1.5 text-center text-gray-300 focus:border-[#E4E7EC] outline-none"
                                 />
                               </td>
                               <td className="p-2.5">
@@ -1024,7 +1024,7 @@ export default function EstoquePage() {
                                   min="0"
                                   value={item.quantidade}
                                   onChange={e => handleUpdateXmlItem(idx, 'quantidade', Number(e.target.value))}
-                                  className="w-24 bg-[#242424] border border-[#2a2a2a] rounded px-2 py-1.5 text-right text-white font-mono focus:border-[#b0fb5d] outline-none"
+                                  className="w-24 bg-[#23262B] border border-[#2E3238] rounded px-2 py-1.5 text-right text-white font-mono focus:border-[#E4E7EC] outline-none"
                                 />
                               </td>
                               <td className="p-2.5">
@@ -1034,7 +1034,7 @@ export default function EstoquePage() {
                                   min="0"
                                   value={item.custo_unitario}
                                   onChange={e => handleUpdateXmlItem(idx, 'custo_unitario', Number(e.target.value))}
-                                  className="w-28 bg-[#242424] border border-[#2a2a2a] rounded px-2 py-1.5 text-right text-gray-300 font-mono focus:border-[#b0fb5d] outline-none"
+                                  className="w-28 bg-[#23262B] border border-[#2E3238] rounded px-2 py-1.5 text-right text-gray-300 font-mono focus:border-[#E4E7EC] outline-none"
                                 />
                               </td>
                               <td className="p-2.5">
@@ -1044,7 +1044,7 @@ export default function EstoquePage() {
                                   min="0"
                                   value={item.preco_venda}
                                   onChange={e => handleUpdateXmlItem(idx, 'preco_venda', Number(e.target.value))}
-                                  className="w-28 bg-[#242424] border border-[#2a2a2a] rounded px-2 py-1.5 text-right text-[#b0fb5d] font-mono focus:border-[#b0fb5d] outline-none"
+                                  className="w-28 bg-[#23262B] border border-[#2E3238] rounded px-2 py-1.5 text-right text-[#E4E7EC] font-mono focus:border-[#E4E7EC] outline-none"
                                 />
                               </td>
                               <td className="p-2.5 text-center">
@@ -1067,12 +1067,12 @@ export default function EstoquePage() {
               )}
             </div>
 
-            <div className="p-5 border-t border-[#2a2a2a] bg-[#141414] rounded-b-xl flex justify-between items-center">
+            <div className="p-5 border-t border-[#2E3238] bg-[#121316] rounded-b-xl flex justify-between items-center">
               <div className="text-xs text-gray-400">
                 {xmlItens.length > 0 ? (
                   <span>
                     Total da Entrada:{' '}
-                    <strong className="text-[#b0fb5d]">
+                    <strong className="text-[#E4E7EC]">
                       {formatCurrency(xmlItens.reduce((acc, it) => acc + Number(it.quantidade) * Number(it.custo_unitario), 0))}
                     </strong>
                   </span>
@@ -1099,7 +1099,7 @@ export default function EstoquePage() {
                       itens: xmlItens,
                     })
                   }
-                  className="flex items-center gap-2 bg-[#b0fb5d] text-black px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#9de44f] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="flex items-center gap-2 bg-[#E4E7EC] text-[#121316] px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#D4D8DF] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   <CheckCircle2 size={16} />
                   {importarXmlMut.isPending ? 'Importando...' : 'Confirmar Importação no Estoque'}
@@ -1114,10 +1114,10 @@ export default function EstoquePage() {
       {(produtoAberto || isCreatingProduto) && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={() => { setProdutoAberto(null); setIsCreatingProduto(false); }} />
-          <div className="relative w-full max-w-xl bg-[#1a1a1a] border-l border-[#2a2a2a] shadow-2xl flex flex-col h-full animate-in slide-in-from-right">
-            <div className="flex items-center justify-between p-6 border-b border-[#2a2a2a] bg-[#141414]">
+          <div className="relative w-full max-w-xl bg-[#1A1C20] border-l border-[#2E3238] shadow-2xl flex flex-col h-full animate-in slide-in-from-right">
+            <div className="flex items-center justify-between p-6 border-b border-[#2E3238] bg-[#121316]">
               <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                {isCreatingProduto ? <><Box className="text-[#b0fb5d]"/> Novo Produto</> : <><Box className="text-[#b0fb5d]"/> Editar Produto</>}
+                {isCreatingProduto ? <><Box className="text-[#E4E7EC]"/> Novo Produto</> : <><Box className="text-[#E4E7EC]"/> Editar Produto</>}
               </h2>
               <button onClick={() => { setProdutoAberto(null); setIsCreatingProduto(false); }} className="text-gray-500 hover:text-white">
                 <X size={20} />
@@ -1126,26 +1126,26 @@ export default function EstoquePage() {
             <div className="flex-1 overflow-y-auto p-6 no-scrollbar">
               <form id="produto-form" onSubmit={handleSalvarProduto} className="space-y-6">
                 <section>
-                  <h3 className="text-xs font-bold text-[#b0fb5d] uppercase tracking-wider mb-3">Identificação</h3>
+                  <h3 className="text-xs font-bold text-[#E4E7EC] uppercase tracking-wider mb-3">Identificação</h3>
                   <div className="space-y-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">Nome / Descrição do Produto *</label>
-                      <input name="nome" defaultValue={produtoAberto?.nome} required className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" />
+                      <input name="nome" defaultValue={produtoAberto?.nome} required className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">SKU (Código Interno)</label>
-                        <input name="sku" defaultValue={produtoAberto?.sku || ''} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" />
+                        <input name="sku" defaultValue={produtoAberto?.sku || ''} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Código de Barras (EAN)</label>
-                        <input name="ean" defaultValue={produtoAberto?.ean || ''} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" />
+                        <input name="ean" defaultValue={produtoAberto?.ean || ''} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Unidade de Medida</label>
-                        <select name="unidade" defaultValue={produtoAberto?.unidade || 'UN'} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none appearance-none">
+                        <select name="unidade" defaultValue={produtoAberto?.unidade || 'UN'} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none appearance-none">
                           <option value="UN">Unidade (UN)</option>
                           <option value="KG">Quilo (KG)</option>
                           <option value="M">Metro (M)</option>
@@ -1155,54 +1155,54 @@ export default function EstoquePage() {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">NCM (Fiscal)</label>
-                        <input name="ncm" defaultValue={produtoAberto?.ncm || ''} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" />
+                        <input name="ncm" defaultValue={produtoAberto?.ncm || ''} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" />
                       </div>
                     </div>
                   </div>
                 </section>
 
                 <section>
-                  <h3 className="text-xs font-bold text-[#b0fb5d] uppercase tracking-wider mb-3">Preços (R$)</h3>
+                  <h3 className="text-xs font-bold text-[#E4E7EC] uppercase tracking-wider mb-3">Preços (R$)</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">Custo Médio</label>
-                      <input name="custo_medio" type="number" step="0.01" min="0" defaultValue={produtoAberto?.custo_medio || '0'} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" />
+                      <input name="custo_medio" type="number" step="0.01" min="0" defaultValue={produtoAberto?.custo_medio || '0'} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">Preço de Venda Final</label>
-                      <input name="preco_venda" type="number" step="0.01" min="0" defaultValue={produtoAberto?.preco_venda || '0'} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" />
+                      <input name="preco_venda" type="number" step="0.01" min="0" defaultValue={produtoAberto?.preco_venda || '0'} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" />
                     </div>
                   </div>
                 </section>
 
                 <section>
-                  <h3 className="text-xs font-bold text-[#b0fb5d] uppercase tracking-wider mb-3">Controle Físico</h3>
+                  <h3 className="text-xs font-bold text-[#E4E7EC] uppercase tracking-wider mb-3">Controle Físico</h3>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">Estoque Atual</label>
-                      <input name="estoque_atual" type="number" step="0.001" defaultValue={produtoAberto?.estoque_atual || '0'} disabled={!isCreatingProduto} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none disabled:opacity-50" title="Para alterar saldo, use o botão Movimentar" />
+                      <input name="estoque_atual" type="number" step="0.001" defaultValue={produtoAberto?.estoque_atual || '0'} disabled={!isCreatingProduto} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none disabled:opacity-50" title="Para alterar saldo, use o botão Movimentar" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">Estoque Mín.</label>
-                      <input name="estoque_minimo" type="number" step="0.001" defaultValue={produtoAberto?.estoque_minimo || '0'} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" />
+                      <input name="estoque_minimo" type="number" step="0.001" defaultValue={produtoAberto?.estoque_minimo || '0'} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">Localização</label>
-                      <input name="localizacao" defaultValue={produtoAberto?.localizacao || ''} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" placeholder="Ex: C-12" />
+                      <input name="localizacao" defaultValue={produtoAberto?.localizacao || ''} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" placeholder="Ex: C-12" />
                     </div>
                   </div>
                 </section>
 
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">Status</label>
-                  <select name="status" defaultValue={produtoAberto?.status || 'ATIVO'} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none">
+                  <select name="status" defaultValue={produtoAberto?.status || 'ATIVO'} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none">
                     <option value="ATIVO">Ativo</option>
                     <option value="INATIVO">Inativo (Não vender)</option>
                   </select>
                 </div>
               </form>
             </div>
-            <div className="p-6 border-t border-[#2a2a2a] bg-[#141414] flex justify-between items-center">
+            <div className="p-6 border-t border-[#2E3238] bg-[#121316] flex justify-between items-center">
               {produtoAberto && (
                 <button onClick={() => { if(confirm('Apagar produto?')) deleteProdutoMut.mutate({ id: produtoAberto.id, product: produtoAberto }); }} disabled={deleteProdutoMut.isPending} className="text-red-500 hover:bg-red-500/10 px-4 py-2 rounded-lg text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50">
                   {deleteProdutoMut.isPending ? 'Excluindo…' : 'Excluir'}
@@ -1211,7 +1211,7 @@ export default function EstoquePage() {
               {!produtoAberto && <div/>}
               <div className="flex gap-3">
                 <button onClick={() => { setProdutoAberto(null); setIsCreatingProduto(false); }} disabled={deleteProdutoMut.isPending} className="px-4 py-2 text-sm text-gray-400 hover:text-white disabled:opacity-50">Cancelar</button>
-                <button type="submit" form="produto-form" disabled={createProdutoMut.isPending || updateProdutoMut.isPending} className="bg-[#b0fb5d] text-black px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#9de44f] disabled:opacity-50">
+                <button type="submit" form="produto-form" disabled={createProdutoMut.isPending || updateProdutoMut.isPending} className="bg-[#E4E7EC] text-[#121316] px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#D4D8DF] disabled:opacity-50">
                   {createProdutoMut.isPending || updateProdutoMut.isPending ? 'Salvando...' : 'Salvar Ficha'}
                 </button>
               </div>
@@ -1224,22 +1224,22 @@ export default function EstoquePage() {
       {movimentarProduto && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setMovimentarProduto(null)} />
-          <div className="relative w-full max-w-md bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-[#2a2a2a]">
+          <div className="relative w-full max-w-md bg-[#1A1C20] border border-[#2E3238] rounded-xl shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-[#2E3238]">
               <h2 className="text-lg font-bold flex items-center gap-2 text-white">Registrar Movimentação</h2>
-              <p className="text-sm text-gray-500 mt-1">Produto: <span className="text-[#b0fb5d]">{movimentarProduto.nome}</span></p>
+              <p className="text-sm text-gray-500 mt-1">Produto: <span className="text-[#E4E7EC]">{movimentarProduto.nome}</span></p>
             </div>
             <div className="p-6">
               <form id="mov-form" onSubmit={handleMovimentar} className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">Produto *</label>
-                  <select value={movimentarProduto.id} onChange={event => { const selected = produtos.find(product => product.id === event.target.value); if (selected) setMovimentarProduto(selected); }} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none">
+                  <select value={movimentarProduto.id} onChange={event => { const selected = produtos.find(product => product.id === event.target.value); if (selected) setMovimentarProduto(selected); }} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none">
                     {produtos.map(product => <option key={product.id} value={product.id}>{product.nome} — saldo: {product.estoque_atual} {product.unidade}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">Tipo de Movimento *</label>
-                  <select name="tipo" required className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none">
+                  <select name="tipo" required className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none">
                     <option value="ENTRADA">Entrada (Compra/Devolução)</option>
                     <option value="SAIDA">Saída (Venda/Perda)</option>
                     <option value="AJUSTE">Ajuste de Inventário (Sobrescreve)</option>
@@ -1247,19 +1247,19 @@ export default function EstoquePage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">Quantidade ({movimentarProduto.unidade}) *</label>
-                  <input name="quantidade" type="number" step="0.001" min="0" required className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" />
+                  <input name="quantidade" type="number" step="0.001" min="0" required className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">Motivo / Observação *</label>
-                  <input name="motivo" required className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" placeholder="Ex: NF 1234, Quebra na loja..." />
+                  <input name="motivo" required className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" placeholder="Ex: NF 1234, Quebra na loja..." />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">Documento de Origem (Opcional)</label>
-                  <input name="documento" className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" placeholder="Nº da Nota ou Pedido" />
+                  <input name="documento" className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" placeholder="Nº da Nota ou Pedido" />
                 </div>
               </form>
             </div>
-            <div className="p-4 border-t border-[#2a2a2a] bg-[#141414] rounded-b-xl flex justify-end gap-3">
+            <div className="p-4 border-t border-[#2E3238] bg-[#121316] rounded-b-xl flex justify-end gap-3">
               <button onClick={() => setMovimentarProduto(null)} className="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancelar</button>
               <button type="submit" form="mov-form" disabled={movimentaMut.isPending} className="bg-blue-500 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-blue-400 disabled:opacity-50">
                 {movimentaMut.isPending ? 'Confirmando...' : 'Confirmar Movimentação'}

@@ -35,9 +35,9 @@ before(async()=>{
     create table workflow_stages(id uuid primary key default gen_random_uuid(),tenant_id uuid not null,workflow_id uuid not null,nome text not null,cor text,ordem integer not null,deleted_at timestamptz,created_at timestamptz not null default now());
     create table producao_cards(id uuid primary key default gen_random_uuid(),tenant_id uuid not null,workflow_id uuid not null,stage_id uuid not null,cliente_id uuid,orcamento_id uuid unique,titulo text not null,descricao text,prioridade text,valor numeric,data_entrega date,dados_customizados jsonb,ordem integer,deleted_at timestamptz,created_at timestamptz not null default now());
     create table orcamento_historico(id uuid primary key default gen_random_uuid(),tenant_id uuid not null,orcamento_id uuid not null,evento text not null,motivo text,actor_user_id uuid,ip text,user_agent text,metadata jsonb,created_at timestamptz not null default now());
-    alter table transacoes_financeiras add column orcamento_id uuid;
-    alter table transacoes_financeiras add column producao_card_id uuid;
-    alter table equipamentos add column deleted_at timestamptz;
+    alter table transacoes_financeiras add column if not exists orcamento_id uuid;
+    alter table transacoes_financeiras add column if not exists producao_card_id uuid;
+    alter table equipamentos add column if not exists deleted_at timestamptz;
     alter table contratos_locacao add column if not exists periodicidade text default 'MENSAL';
     alter table contratos_locacao add column if not exists dia_vencimento integer default 5;
     alter table contratos_locacao add column if not exists indice_reajuste text default 'IGP-M';
@@ -213,6 +213,7 @@ test('finance transaction can be soft deleted',async()=>{
   assert.equal(listed.statusCode,200,listed.body);
   assert.equal(listed.json().data.data.some((row:{id:string})=>row.id===id),false);
 });
+const isoDaysFromNow=(days:number)=>new Date(Date.now()+days*86_400_000).toISOString().slice(0,10);
 test('finance payments record every method, support partial balances, and restrict reversal reasons to ADMIN',async()=>{
   const admin=await login(),adminHeaders={authorization:`Bearer ${admin.token}`};
   const finance=await loginAs('financeiro@nexo.local'),financeHeaders={authorization:`Bearer ${finance.token}`};
@@ -220,7 +221,7 @@ test('finance payments record every method, support partial balances, and restri
   const methods=['DINHEIRO','PIX','CARTAO_CREDITO','CARTAO_DEBITO','BOLETO','TRANSFERENCIA','OUTRO'] as const;
   let reversedId='';
   for(const [index,metodo] of methods.entries()){
-    const created=await app.inject({method:'POST',url:'/financeiro/transacoes',headers:adminHeaders,payload:{tipo:'RECEITA',descricao:`Pagamento QA ${metodo}`,valor:100,data_competencia:'2026-10-15',data_vencimento:'2026-10-30',categoria:'Teste'}});
+    const created=await app.inject({method:'POST',url:'/financeiro/transacoes',headers:adminHeaders,payload:{tipo:'RECEITA',descricao:`Pagamento QA ${metodo}`,valor:100,data_competencia:'2026-10-15',data_vencimento:isoDaysFromNow(30),categoria:'Teste'}});
     assert.equal(created.statusCode,200,created.body);
     const id=created.json().data.id as string;
     const paid=await app.inject({method:'POST',url:`/financeiro/transacoes/${id}/baixas`,headers:financeHeaders,payload:{valor:100,data_pagamento:'2026-10-15',metodo,metodo_outro:metodo==='OUTRO'?'Carteira digital':undefined,observacao:'Comprovante conferido'}});
@@ -258,7 +259,7 @@ test('finance payments record every method, support partial balances, and restri
 test('partial payments keep an open balance or explicitly write it off when settled',async()=>{
   const session=await login(),headers={authorization:`Bearer ${session.token}`};
   const create=async(descricao:string)=>{
-    const result=await app.inject({method:'POST',url:'/financeiro/transacoes',headers,payload:{tipo:'RECEITA',descricao,valor:100,data_competencia:'2026-10-15',data_vencimento:'2026-10-30',categoria:'Teste'}});
+    const result=await app.inject({method:'POST',url:'/financeiro/transacoes',headers,payload:{tipo:'RECEITA',descricao,valor:100,data_competencia:'2026-10-15',data_vencimento:isoDaysFromNow(30),categoria:'Teste'}});
     assert.equal(result.statusCode,200,result.body);return result.json().data.id as string;
   };
   const openId=await create('Pagamento parcial em aberto QA');
@@ -500,3 +501,291 @@ test('CNPJ lookup queries api.w14n.dev/v1 first and falls back to BrasilAPI on 4
   assert.equal(fallbackResult.endereco.rua,'PRAÇA DA SÉ');
   assert.equal(fallbackResult.endereco.uf,'SP');
 });
+
+async function injectJson<T = unknown>(
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  url: string,
+  token?: string,
+  payload?: unknown,
+): Promise<{ statusCode: number; body: T; rawBody: string }> {
+  const res = await app.inject({
+    method,
+    url,
+    remoteAddress: '10.255.0.1',
+    headers: {
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(payload !== undefined ? { 'content-type': 'application/json' } : {}),
+    },
+    ...(payload !== undefined ? { payload: JSON.stringify(payload) } : {}),
+  });
+  let body = null as T;
+  try {
+    body = JSON.parse(res.body) as T;
+  } catch {
+    body = res.body as unknown as T;
+  }
+  return { statusCode: res.statusCode, body, rawBody: res.body };
+}
+
+let cachedArtSteelToken: string | null = null;
+async function getArtSteelToken(rememberMe?: boolean): Promise<string> {
+  if (!rememberMe && cachedArtSteelToken) return cachedArtSteelToken;
+  const loginRes = await injectJson<{ success: boolean; data: { token: string } }>(
+    'POST',
+    '/auth/login',
+    undefined,
+    {
+      email: 'teste@nexo.local',
+      password: 'Strong-Test-Password',
+      ...(rememberMe !== undefined ? { rememberMe } : {}),
+    },
+  );
+  assert.equal(loginRes.statusCode, 200, loginRes.rawBody);
+  const token = loginRes.body?.data?.token;
+  assert.ok(token, loginRes.rawBody);
+  if (!rememberMe) cachedArtSteelToken = token;
+  return token;
+}
+
+test('artsteel: cadastro de cliente 100% opcional e limpeza de campos no PUT', async () => {
+  const token = await getArtSteelToken();
+
+  const createEmptyRes = await injectJson<{
+    success: boolean;
+    data: { id: string; nome: string; status: string };
+  }>('POST', '/clientes', token, {});
+  assert.ok([200, 201].includes(createEmptyRes.statusCode), createEmptyRes.rawBody);
+  assert.equal(createEmptyRes.body.success, true);
+  assert.equal(createEmptyRes.body.data.nome, 'Cliente sem nome');
+  assert.equal(createEmptyRes.body.data.status, 'ATIVO');
+
+  const createPartialRes = await injectJson<{
+    success: boolean;
+    data: { id: string; nome: string; email: string | null; telefone: string | null };
+  }>('POST', '/clientes', token, {
+    nome: 'Cliente Parcial ArtSteel',
+    email: '',
+    telefone: '(31) 99999-0000',
+  });
+  assert.ok([200, 201].includes(createPartialRes.statusCode), createPartialRes.rawBody);
+  assert.equal(createPartialRes.body.data.nome, 'Cliente Parcial ArtSteel');
+  assert.equal(createPartialRes.body.data.email, null);
+
+  const updateClearRes = await injectJson<{
+    success: boolean;
+    data: { telefone: string | null; email: string | null };
+  }>('PUT', `/clientes/${createPartialRes.body.data.id}`, token, {
+    telefone: '',
+    email: '',
+  });
+  assert.equal(updateClearRes.statusCode, 200, updateClearRes.rawBody);
+  assert.equal(updateClearRes.body.data.telefone, null);
+  assert.equal(updateClearRes.body.data.email, null);
+});
+
+test('artsteel: equipamento default Média, contrato sem data fim, renovação automática mensal e encerramento', async () => {
+  const token = await getArtSteelToken();
+
+  const eqRes = await injectJson<{
+    success: boolean;
+    data: { id: string; criticidade: string; patrimonio: string; valor_locacao: number; status: string };
+  }>('POST', '/locacao/equipamentos', token, {
+    nome: 'Andaimes Art Steel Teste',
+    patrimonio: 'PAT-ART-070',
+    valor_locacao: 450,
+  });
+  assert.equal(eqRes.statusCode, 201, eqRes.rawBody);
+  assert.equal(eqRes.body.success, true);
+  assert.equal(eqRes.body.data.criticidade, 'Média');
+  assert.equal(eqRes.body.data.patrimonio, 'PAT-ART-070');
+  assert.equal(Number(eqRes.body.data.valor_locacao), 450);
+
+  const contratoRes = await injectJson<{
+    success: boolean;
+    data: {
+      id: string;
+      data_fim_prevista: string | null;
+      renovacao_automatica: boolean;
+      ciclos_cobrados: number;
+    };
+  }>('POST', '/locacao/contratos', token, {
+    cliente_id: customerA,
+    data_inicio: isoDaysFromNow(-70),
+    equipamento_ids: [eqRes.body.data.id],
+  });
+  assert.ok([200, 201].includes(contratoRes.statusCode), contratoRes.rawBody);
+  assert.equal(contratoRes.body.success, true);
+  assert.equal(contratoRes.body.data.data_fim_prevista, null);
+  assert.equal(contratoRes.body.data.renovacao_automatica, true);
+  assert.equal(Number(contratoRes.body.data.ciclos_cobrados), 3);
+
+  const contratoId = contratoRes.body.data.id;
+  const txSearch = encodeURIComponent('Mensalidade Locação');
+  const txBeforeRes = await injectJson<{
+    success: boolean;
+    data: {
+      data: Array<{ id: string; tipo: string; valor: number; anexos?: { contrato_id?: string; ciclo?: number } | null }>;
+    };
+  }>('GET', `/financeiro/transacoes?tipo=RECEITA&limit=100&search=${txSearch}`, token);
+  assert.equal(txBeforeRes.statusCode, 200, txBeforeRes.rawBody);
+  const txBeforeRows = txBeforeRes.body.data.data.filter((row) => row.anexos?.contrato_id === contratoId);
+  assert.equal(txBeforeRows.length, 3);
+  for (const row of txBeforeRows) {
+    assert.equal(row.tipo, 'RECEITA');
+  }
+
+  const listRes = await injectJson<{
+    success: boolean;
+    data: Array<{ id: string; ciclos_cobrados: number; renovacao_automatica: boolean }>;
+  }>('GET', '/locacao/contratos', token);
+  assert.equal(listRes.statusCode, 200, listRes.rawBody);
+  const listed = listRes.body.data.find((item) => item.id === contratoId);
+  assert.ok(listed);
+  assert.equal(Number(listed.ciclos_cobrados), 3);
+
+  const txAfterRes = await injectJson<{
+    success: boolean;
+    data: {
+      data: Array<{ id: string; anexos?: { contrato_id?: string } | null }>;
+    };
+  }>('GET', `/financeiro/transacoes?tipo=RECEITA&limit=100&search=${txSearch}`, token);
+  assert.equal(txAfterRes.statusCode, 200, txAfterRes.rawBody);
+  const txAfterRows = txAfterRes.body.data.data.filter((row) => row.anexos?.contrato_id === contratoId);
+  assert.equal(txAfterRows.length, 3);
+
+  const encerrarRes = await injectJson<{
+    success: boolean;
+    data: { status: string; renovacao_automatica: boolean };
+  }>('PUT', `/locacao/contratos/${contratoId}/encerrar`, token, {});
+  assert.equal(encerrarRes.statusCode, 200, encerrarRes.rawBody);
+  assert.equal(encerrarRes.body.success, true);
+  assert.equal(encerrarRes.body.data.status, 'ENCERRADO');
+  assert.equal(encerrarRes.body.data.renovacao_automatica, false);
+
+  const eqAfterRes = await injectJson<{
+    success: boolean;
+    data: Array<{ id: string; status: string }>;
+  }>('GET', '/locacao/equipamentos', token);
+  assert.equal(eqAfterRes.statusCode, 200, eqAfterRes.rawBody);
+  const eqAfter = eqAfterRes.body.data.find((item) => item.id === eqRes.body.data.id);
+  assert.equal(eqAfter?.status, 'DISPONIVEL');
+});
+
+test('artsteel: contas a pagar ordenadas por vencimento e lembretes_a_pagar no dashboard', async () => {
+  const token = await getArtSteelToken();
+  const marker = 'LMB-ARTSTEEL-VENC';
+
+  const entries = [
+    { desc: `${marker}-5D`, due: isoDaysFromNow(5), valor: 500 },
+    { desc: `${marker}-ATRASADA`, due: isoDaysFromNow(-3), valor: 300 },
+    { desc: `${marker}-HOJE`, due: isoDaysFromNow(0), valor: 200 },
+  ];
+
+  for (const item of entries) {
+    const postRes = await injectJson<{ success: boolean }>(
+      'POST',
+      '/financeiro/transacoes',
+      token,
+      {
+        tipo: 'DESPESA',
+        descricao: item.desc,
+        valor: item.valor,
+        data_competencia: item.due,
+        data_vencimento: item.due,
+        status: 'PENDENTE',
+        categoria: 'Fornecedores',
+      },
+    );
+    assert.ok([200, 201].includes(postRes.statusCode), postRes.rawBody);
+  }
+
+  const listRes = await injectJson<{
+    success: boolean;
+    data: { data: Array<{ descricao: string; data_vencimento: string }> };
+  }>('GET', `/financeiro/transacoes?tipo=DESPESA&status=ABERTO&search=${encodeURIComponent(marker)}`, token);
+  assert.equal(listRes.statusCode, 200, listRes.rawBody);
+  const payables = listRes.body.data.data;
+  assert.equal(payables.length, 3);
+  assert.equal(payables[0]?.descricao, `${marker}-ATRASADA`);
+  assert.equal(payables[1]?.descricao, `${marker}-HOJE`);
+  assert.equal(payables[2]?.descricao, `${marker}-5D`);
+
+  const dashRes = await injectJson<{
+    success: boolean;
+    data: {
+      lembretes_a_pagar: {
+        vencidas: { quantidade: number; total: number };
+        vence_hoje: { quantidade: number; total: number };
+        proximos_7_dias: { quantidade: number; total: number };
+      };
+    };
+  }>('GET', '/financeiro/dashboard', token);
+  assert.equal(dashRes.statusCode, 200, dashRes.rawBody);
+  assert.ok(dashRes.body.data.lembretes_a_pagar.vencidas.quantidade >= 1);
+  assert.ok(dashRes.body.data.lembretes_a_pagar.vence_hoje.quantidade >= 1);
+  assert.ok(dashRes.body.data.lembretes_a_pagar.proximos_7_dias.quantidade >= 1);
+});
+
+test('artsteel: persistência de /empresa e preservação de remember no switch-tenant', async () => {
+  const token = await getArtSteelToken(true);
+
+  const putEmpresaRes = await injectJson<{ success: boolean }>('PUT', '/empresa', token, {
+    nome_fantasia: 'Art Steel Locações',
+    razao_social: 'Filomeno Serviços Ltda.',
+    cnpj: '51.972.840/0001-57',
+    telefone: '(31) 97341-1767',
+    email: 'artsteel56@gmail.com',
+  });
+  assert.equal(putEmpresaRes.statusCode, 200, putEmpresaRes.rawBody);
+
+  const getEmpresaRes = await injectJson<{
+    success: boolean;
+    data: { nome_fantasia: string; razao_social: string };
+  }>('GET', '/empresa', token);
+  assert.equal(getEmpresaRes.statusCode, 200, getEmpresaRes.rawBody);
+  assert.equal(getEmpresaRes.body.data.nome_fantasia, 'Art Steel Locações');
+  assert.equal(getEmpresaRes.body.data.razao_social, 'Filomeno Serviços Ltda.');
+
+  const switchRes = await injectJson<{ success: boolean; data: { token: string } }>(
+    'POST',
+    '/auth/switch-tenant',
+    token,
+    { target_tenant_id: b },
+  );
+  assert.equal(switchRes.statusCode, 200, switchRes.rawBody);
+  const switchedToken = switchRes.body.data.token;
+  assert.ok(switchedToken && switchedToken.includes('.'));
+
+  const payload = JSON.parse(
+    Buffer.from(switchedToken.split('.')[1]!, 'base64url').toString('utf8'),
+  ) as { remember?: boolean; iat: number; exp: number };
+  assert.equal(payload.remember, true);
+  assert.ok(payload.exp - payload.iat > 20 * 86400);
+});
+
+test('artsteel: bloqueia cliente_id de outro tenant no orçamento e sanitiza sort de protótipo', async () => {
+  const token = await getArtSteelToken();
+
+  const crossTenantQuote = await injectJson<{ success: boolean; error?: { code?: string } }>(
+    'POST',
+    '/orcamentos',
+    token,
+    {
+      cliente_id: customerB,
+      tipo: 'SERVICO',
+      itens: [{ produto_nome: 'Portão', quantidade: 1, valor_unitario: 100 }],
+    },
+  );
+  assert.equal(crossTenantQuote.statusCode, 400, crossTenantQuote.rawBody);
+  assert.equal(crossTenantQuote.body.error?.code, 'INVALID_CUSTOMER');
+
+  const protoSortRes = await injectJson<{ success: boolean }>(
+    'GET',
+    '/financeiro/transacoes?sort=toString:asc',
+    token,
+  );
+  assert.equal(protoSortRes.statusCode, 200, protoSortRes.rawBody);
+  assert.equal(protoSortRes.body.success, true);
+});
+
+

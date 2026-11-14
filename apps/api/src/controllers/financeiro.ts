@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import { withTenant, type Database } from '../db/client.js';
 import { auth, HttpError, requireRole } from '../middlewares/auth.js';
 import {pageQuery,pageResult,safeSort} from '../lib/pagination.js';
+import { processTenantContractRenewals } from '../services/contract-renewal.js';
 
 const paymentSchema = z.object({
   valor: z.number().positive().refine(value => Math.abs(Math.round(value * 100) - value * 100) < 1e-7, 'Informe no máximo duas casas decimais.'),
@@ -59,9 +60,11 @@ export async function financeiroRoutes(app: FastifyInstance, db: Database) {
   });
 
   app.get('/financeiro/dashboard', async req => {
-    const rows = await withTenant(db, req.user.current_tenant_id, async tx => {
-      if (await hasPagamentosTable(tx)) {
-        return tx.execute(sql`
+    const result = await withTenant(db, req.user.current_tenant_id, async tx => {
+      await processTenantContractRenewals(tx, req.user.current_tenant_id);
+      const hasPagamentos = await hasPagamentosTable(tx);
+      const rows = hasPagamentos
+        ? await tx.execute(sql`
           WITH pagamentos AS (
             SELECT tenant_id,transacao_id,
               SUM(valor) FILTER (WHERE revertido_em IS NULL) AS valor_pago,
@@ -78,42 +81,111 @@ export async function financeiroRoutes(app: FastifyInstance, db: Database) {
           FROM transacoes_financeiras t
           LEFT JOIN pagamentos p ON p.tenant_id=t.tenant_id AND p.transacao_id=t.id
           WHERE t.tenant_id = ${req.user.current_tenant_id}::uuid AND t.deleted_at IS NULL
+        `)
+        : await tx.execute(sql`
+          SELECT
+            COALESCE(SUM(CASE WHEN t.tipo='RECEITA' AND t.status='PAGO' THEN COALESCE((t.anexos->>'valor_pago')::numeric, t.valor) ELSE 0 END),0) AS total_recebido,
+            COALESCE(SUM(CASE WHEN t.tipo='DESPESA' AND t.status='PAGO' THEN COALESCE((t.anexos->>'valor_pago')::numeric, t.valor) ELSE 0 END),0) AS total_pago,
+            COALESCE(SUM(CASE WHEN t.tipo='RECEITA' AND t.status IN ('PENDENTE','ATRASADO') THEN GREATEST(t.valor-COALESCE((t.anexos->>'valor_liquidado')::numeric, 0),0) ELSE 0 END),0) AS receitas_pendentes,
+            COALESCE(SUM(CASE WHEN t.tipo='DESPESA' AND t.status IN ('PENDENTE','ATRASADO') THEN GREATEST(t.valor-COALESCE((t.anexos->>'valor_liquidado')::numeric, 0),0) ELSE 0 END),0) AS despesas_pendentes
+          FROM transacoes_financeiras t
+          WHERE t.tenant_id = ${req.user.current_tenant_id}::uuid AND t.deleted_at IS NULL
         `);
-      }
 
-      return tx.execute(sql`
-        SELECT
-          COALESCE(SUM(CASE WHEN t.tipo='RECEITA' AND t.status='PAGO' THEN COALESCE((t.anexos->>'valor_pago')::numeric, t.valor) ELSE 0 END),0) AS total_recebido,
-          COALESCE(SUM(CASE WHEN t.tipo='DESPESA' AND t.status='PAGO' THEN COALESCE((t.anexos->>'valor_pago')::numeric, t.valor) ELSE 0 END),0) AS total_pago,
-          COALESCE(SUM(CASE WHEN t.tipo='RECEITA' AND t.status IN ('PENDENTE','ATRASADO') THEN GREATEST(t.valor-COALESCE((t.anexos->>'valor_liquidado')::numeric, 0),0) ELSE 0 END),0) AS receitas_pendentes,
-          COALESCE(SUM(CASE WHEN t.tipo='DESPESA' AND t.status IN ('PENDENTE','ATRASADO') THEN GREATEST(t.valor-COALESCE((t.anexos->>'valor_liquidado')::numeric, 0),0) ELSE 0 END),0) AS despesas_pendentes
-        FROM transacoes_financeiras t
-        WHERE t.tenant_id = ${req.user.current_tenant_id}::uuid AND t.deleted_at IS NULL
-      `);
-    });
-    const data = rows[0] || { total_recebido: 0, total_pago: 0, receitas_pendentes: 0, despesas_pendentes: 0 };
-    return { 
-      success: true, 
-      data: {
+      const payablesRows = hasPagamentos
+        ? await tx.execute(sql`
+          WITH pagamentos AS (
+            SELECT tenant_id,transacao_id,
+              SUM(valor+valor_dispensado) FILTER (WHERE revertido_em IS NULL) AS valor_liquidado
+            FROM financeiro_pagamentos
+            WHERE tenant_id=${req.user.current_tenant_id}::uuid
+            GROUP BY tenant_id,transacao_id
+          )
+          SELECT t.id, t.descricao, t.valor, t.data_vencimento::text AS data_vencimento, t.status, t.categoria,
+            GREATEST(t.valor-COALESCE(p.valor_liquidado,0),0) AS saldo_aberto,
+            (t.data_vencimento - CURRENT_DATE)::int AS dias_para_vencer
+          FROM transacoes_financeiras t
+          LEFT JOIN pagamentos p ON p.tenant_id=t.tenant_id AND p.transacao_id=t.id
+          WHERE t.tenant_id = ${req.user.current_tenant_id}::uuid
+            AND t.deleted_at IS NULL
+            AND t.tipo = 'DESPESA'
+            AND t.status IN ('PENDENTE', 'ATRASADO')
+            AND GREATEST(t.valor-COALESCE(p.valor_liquidado,0),0) > 0
+          ORDER BY t.data_vencimento ASC, t.id ASC
+        `)
+        : await tx.execute(sql`
+          SELECT t.id, t.descricao, t.valor, t.data_vencimento::text AS data_vencimento, t.status, t.categoria,
+            GREATEST(t.valor-COALESCE((t.anexos->>'valor_liquidado')::numeric, 0),0) AS saldo_aberto,
+            (t.data_vencimento - CURRENT_DATE)::int AS dias_para_vencer
+          FROM transacoes_financeiras t
+          WHERE t.tenant_id = ${req.user.current_tenant_id}::uuid
+            AND t.deleted_at IS NULL
+            AND t.tipo = 'DESPESA'
+            AND t.status IN ('PENDENTE', 'ATRASADO')
+            AND GREATEST(t.valor-COALESCE((t.anexos->>'valor_liquidado')::numeric, 0),0) > 0
+          ORDER BY t.data_vencimento ASC, t.id ASC
+        `);
+
+      const data = rows[0] || { total_recebido: 0, total_pago: 0, receitas_pendentes: 0, despesas_pendentes: 0 };
+      const payables = payablesRows.map(item => ({
+        id: String(item.id),
+        descricao: String(item.descricao),
+        valor: Number(item.valor),
+        saldo_aberto: Number(item.saldo_aberto),
+        data_vencimento: String(item.data_vencimento).slice(0, 10),
+        status: String(item.status),
+        categoria: String(item.categoria ?? 'Outros'),
+        dias_para_vencer: Number(item.dias_para_vencer ?? 0),
+      }));
+
+      const vencidas = payables.filter(p => p.dias_para_vencer < 0);
+      const venceHoje = payables.filter(p => p.dias_para_vencer === 0);
+      const proximos7Dias = payables.filter(p => p.dias_para_vencer > 0 && p.dias_para_vencer <= 7);
+
+      return {
         saldo_atual: Number(data.total_recebido) - Number(data.total_pago),
         receitas_pendentes: Number(data.receitas_pendentes),
-        despesas_pendentes: Number(data.despesas_pendentes)
-      }, 
-      error: null 
-    };
+        despesas_pendentes: Number(data.despesas_pendentes),
+        lembretes_a_pagar: {
+          vencidas: { quantidade: vencidas.length, total: vencidas.reduce((acc, p) => acc + p.saldo_aberto, 0) },
+          vence_hoje: { quantidade: venceHoje.length, total: venceHoje.reduce((acc, p) => acc + p.saldo_aberto, 0) },
+          proximos_7_dias: { quantidade: proximos7Dias.length, total: proximos7Dias.reduce((acc, p) => acc + p.saldo_aberto, 0) },
+          proximas_contas: payables.slice(0, 5),
+        },
+      };
+    });
+    return { success: true, data: result, error: null };
   });
 
   app.get('/financeiro/transacoes', async req => {
     const page=pageQuery(req.query);
-    const sort=safeSort(page.sort,{data_vencimento:'data_vencimento',valor:'valor',created_at:'created_at',status:'status'},'data_vencimento');
+    const { tipo } = z.object({ tipo: z.enum(['RECEITA', 'DESPESA', 'TRANSFERENCIA']).optional() }).parse(req.query);
+    const statusFilter = page.status ? z.enum(['PENDENTE', 'PAGO', 'ATRASADO', 'CANCELADO', 'ABERTO']).parse(page.status) : undefined;
+    const defaultSort = tipo === 'DESPESA' || statusFilter === 'ABERTO' ? 'data_vencimento:asc' : undefined;
+    const sort=safeSort(page.sort ?? defaultSort,{data_vencimento:'data_vencimento',valor:'valor',created_at:'created_at',status:'status'},'data_vencimento');
     const isOwner = await tenantRole(db, req.user.sub, req.user.current_tenant_id) === 'ADMIN';
     const result=await withTenant(db,req.user.current_tenant_id,async tx=>{
       const term=page.search?`%${page.search}%`:null;
+      const tipoClause = tipo ? sql`AND tipo = ${tipo}` : sql``;
+      const statusClause = statusFilter === 'ABERTO'
+        ? sql`AND status IN ('PENDENTE', 'ATRASADO')`
+        : statusFilter
+          ? sql`AND status = ${statusFilter}`
+          : sql``;
+      const tipoAliasClause = tipo ? sql`AND t.tipo = ${tipo}` : sql``;
+      const statusAliasClause = statusFilter === 'ABERTO'
+        ? sql`AND t.status IN ('PENDENTE', 'ATRASADO')`
+        : statusFilter
+          ? sql`AND t.status = ${statusFilter}`
+          : sql``;
+
       const [count]=await tx.execute(sql`
         SELECT count(*)::int total 
         FROM transacoes_financeiras 
         WHERE tenant_id = ${req.user.current_tenant_id}::uuid 
           AND deleted_at is null 
+          ${tipoClause}
+          ${statusClause}
           AND (${term}::text is null or descricao ilike ${term} or categoria ilike ${term} or conta_bancaria ilike ${term})
       `);
 
@@ -124,8 +196,10 @@ export async function financeiroRoutes(app: FastifyInstance, db: Database) {
             FROM transacoes_financeiras t
             WHERE t.tenant_id = ${req.user.current_tenant_id}::uuid
               AND t.deleted_at is null
+              ${tipoAliasClause}
+              ${statusAliasClause}
               AND (${term}::text is null or t.descricao ilike ${term} or t.categoria ilike ${term} or t.conta_bancaria ilike ${term})
-            ORDER BY ${sql.raw(sort.column)} ${sql.raw(sort.direction)}
+            ORDER BY ${sql.raw(sort.column)} ${sql.raw(sort.direction)}, t.id ASC
             LIMIT ${page.limit} OFFSET ${page.offset}
           ), pagamentos AS (
             SELECT p.tenant_id,p.transacao_id,
@@ -148,7 +222,7 @@ export async function financeiroRoutes(app: FastifyInstance, db: Database) {
             COALESCE(p.pagamentos,'[]'::jsonb) AS pagamentos
           FROM pagina t
           LEFT JOIN pagamentos p ON p.tenant_id=t.tenant_id AND p.transacao_id=t.id
-          ORDER BY ${sql.raw(sort.column)} ${sql.raw(sort.direction)}
+          ORDER BY ${sql.raw(sort.column)} ${sql.raw(sort.direction)}, t.id ASC
         `);
         return pageResult(rows,page.page,page.limit,Number(count.total));
       }
@@ -158,8 +232,10 @@ export async function financeiroRoutes(app: FastifyInstance, db: Database) {
         FROM transacoes_financeiras t
         WHERE t.tenant_id = ${req.user.current_tenant_id}::uuid
           AND t.deleted_at is null
+          ${tipoAliasClause}
+          ${statusAliasClause}
           AND (${term}::text is null or t.descricao ilike ${term} or t.categoria ilike ${term} or t.conta_bancaria ilike ${term})
-        ORDER BY ${sql.raw(sort.column)} ${sql.raw(sort.direction)}
+        ORDER BY ${sql.raw(sort.column)} ${sql.raw(sort.direction)}, t.id ASC
         LIMIT ${page.limit} OFFSET ${page.offset}
       `);
 

@@ -179,7 +179,7 @@ export default function OrcamentosPage() {
   const [formData, setFormData] = useState<any>({ cliente_id: '', tipo: 'SERVICO', validade: '', condicoes_pagamento: '', prazo_entrega: '', observacoes: '' });
   const [orcamentoParaAprovar, setOrcamentoParaAprovar] = useState<Orcamento | null>(null);
   const [orcamentoParaApagar, setOrcamentoParaApagar] = useState<Orcamento | null>(null);
-  const [periodoLocacao, setPeriodoLocacao] = useState({ data_inicio: '', data_fim_prevista: '' });
+  const [periodoLocacao, setPeriodoLocacao] = useState({ data_inicio: '' });
 
   useEffect(() => {
     if (!canCreateRentalQuote && formData.tipo === 'LOCACAO') {
@@ -252,7 +252,7 @@ export default function OrcamentosPage() {
     invalidate: 'orcamentos',
   });
 
-  const aprovarMut = useOptimisticMutation<{conta_id:string;contrato_id:string|null;card_id:string|null;alreadyApproved:boolean}, {id:string;locacao?:{data_inicio:string;data_fim_prevista:string}}>({
+  const aprovarMut = useOptimisticMutation<{conta_id:string;contrato_id:string|null;card_id:string|null;alreadyApproved:boolean}, {id:string;locacao?:{data_inicio:string;data_fim_prevista?:string|null}}>({
     mutationFn: ({id,locacao}) => api<{conta_id:string;contrato_id:string|null;card_id:string|null;alreadyApproved:boolean}>(`/orcamentos/${id}/aprovar`, { method: 'PUT', body: JSON.stringify(locacao?{locacao}:{}) }),
     queryKeys: [quoteListPrefix],
     apply: (oldData, variables) => updateQuoteLists(oldData, items => items.map(item => item.id === variables.id ? { ...item, status: 'APROVADO', aprovado_em: item.aprovado_em ?? new Date().toISOString() } : item)),
@@ -269,8 +269,7 @@ export default function OrcamentosPage() {
   const approveQuote=(orcamento:Orcamento)=>{
     if(canCreateRentalQuote && orcamento.tipo==='LOCACAO') {
       const data_inicio = dateInputValue(new Date());
-      const data_fim_prevista = dateInputValue(new Date(Date.now() + 30 * 86_400_000));
-      setPeriodoLocacao({ data_inicio, data_fim_prevista });
+      setPeriodoLocacao({ data_inicio });
       setOrcamentoParaAprovar(orcamento);
       return;
     }
@@ -279,15 +278,11 @@ export default function OrcamentosPage() {
 
   const confirmarAprovacaoLocacao = () => {
     if (!orcamentoParaAprovar) return;
-    if (!periodoLocacao.data_inicio || !periodoLocacao.data_fim_prevista) {
-      toast.error('Informe o início e o fim da locação.');
+    if (!periodoLocacao.data_inicio) {
+      toast.error('Informe a data de retirada.');
       return;
     }
-    if (periodoLocacao.data_fim_prevista <= periodoLocacao.data_inicio) {
-      toast.error('O fim da locação deve ser posterior ao início.');
-      return;
-    }
-    aprovarMut.mutate({ id: orcamentoParaAprovar.id, locacao: periodoLocacao });
+    aprovarMut.mutate({ id: orcamentoParaAprovar.id, locacao: { data_inicio: periodoLocacao.data_inicio, data_fim_prevista: null } });
   };
 
   const reprovarMut = useOptimisticMutation<unknown, {id:string;motivo:string}>({
@@ -518,40 +513,40 @@ export default function OrcamentosPage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#141414] text-white p-8 animate-in fade-in duration-300 relative">
+    <div className="flex flex-col h-full bg-[#121316] text-white p-8 animate-in fade-in duration-300 relative">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <FileText className="text-[#b0fb5d]" size={28} /> {isSerralheria ? 'Orçamentos & Contratos' : 'Propostas & Orçamentos'}
+            <FileText className="text-[#E4E7EC]" size={28} /> {isSerralheria ? 'Orçamentos & Contratos' : 'Propostas & Orçamentos'}
           </h1>
-          <div className="flex gap-6 mt-3 border-b border-[#2a2a2a] overflow-x-auto no-scrollbar">
-            <button onClick={() => setActiveTab('lista')} className={`pb-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'lista' ? 'border-[#b0fb5d] text-[#b0fb5d]' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>Meus Orçamentos</button>
+          <div className="flex gap-6 mt-3 border-b border-[#2E3238] overflow-x-auto no-scrollbar">
+            <button onClick={() => setActiveTab('lista')} className={`pb-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'lista' ? 'border-[#E4E7EC] text-[#E4E7EC]' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>Meus Orçamentos</button>
             {isSerralheria && (
-              <button onClick={() => setActiveTab('contratos')} className={`pb-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'contratos' ? 'border-[#b0fb5d] text-[#b0fb5d]' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>Contratos</button>
+              <button onClick={() => setActiveTab('contratos')} className={`pb-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'contratos' ? 'border-[#E4E7EC] text-[#E4E7EC]' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>Contratos</button>
             )}
-            <button onClick={() => setActiveTab('dashboard')} className={`pb-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'dashboard' ? 'border-[#b0fb5d] text-[#b0fb5d]' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>Métricas & Funil</button>
+            <button onClick={() => setActiveTab('dashboard')} className={`pb-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'dashboard' ? 'border-[#E4E7EC] text-[#E4E7EC]' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>Métricas & Funil</button>
           </div>
         </div>
-        <button onClick={() => { setIsCreating(true); setItens([createEmptyWizardItem()]); }} className="flex items-center gap-2 text-sm px-5 py-2.5 bg-[#b0fb5d] text-black font-bold rounded-lg hover:bg-[#9de44f] transition-all">
+        <button onClick={() => { setIsCreating(true); setItens([createEmptyWizardItem()]); }} className="flex items-center gap-2 text-sm px-5 py-2.5 bg-[#E4E7EC] text-[#121316] font-bold rounded-lg hover:bg-[#D4D8DF] transition-all">
           <Plus size={16}/> Novo Orçamento
         </button>
       </div>
 
       {activeTab === 'dashboard' && (
         <div className="grid grid-cols-4 gap-4">
-          <div className="bg-[#1a1a1a] p-5 rounded-xl border border-[#2a2a2a]">
+          <div className="bg-[#1A1C20] p-5 rounded-xl border border-[#2E3238]">
             <span className="text-gray-400 text-xs font-semibold uppercase">Total Emitido</span>
             <div className="text-2xl font-bold mt-2 text-white">{dashboard?.total_orcamentos || 0}</div>
           </div>
-          <div className="bg-[#1a1a1a] p-5 rounded-xl border-t-2 border-t-[#b0fb5d] border-[#2a2a2a] border-l border-r border-b">
-            <span className="text-gray-400 text-xs font-semibold uppercase">Receita Aprovada (MRR)</span>
-            <div className="text-2xl font-bold mt-2 text-[#b0fb5d]">{formatCurrency(dashboard?.receita_aprovada || 0)}</div>
+          <div className="bg-[#1A1C20] p-5 rounded-xl border-t-2 border-t-[#E4E7EC] border-[#2E3238] border-l border-r border-b">
+            <span className="text-gray-400 text-xs font-semibold uppercase">Receita Aprovada (Mensal)</span>
+            <div className="text-2xl font-bold mt-2 text-[#E4E7EC]">{formatCurrency(dashboard?.receita_aprovada || 0)}</div>
           </div>
-          <div className="bg-[#1a1a1a] p-5 rounded-xl border-t-2 border-t-blue-500 border-[#2a2a2a] border-l border-r border-b">
+          <div className="bg-[#1A1C20] p-5 rounded-xl border-t-2 border-t-blue-500 border-[#2E3238] border-l border-r border-b">
             <span className="text-gray-400 text-xs font-semibold uppercase">Aguardando Resposta</span>
             <div className="text-2xl font-bold mt-2 text-blue-400">{dashboard?.aguardando_resposta || 0} pendentes</div>
           </div>
-          <div className="bg-[#1a1a1a] p-5 rounded-xl border-t-2 border-t-red-500 border-[#2a2a2a] border-l border-r border-b">
+          <div className="bg-[#1A1C20] p-5 rounded-xl border-t-2 border-t-red-500 border-[#2E3238] border-l border-r border-b">
             <span className="text-gray-400 text-xs font-semibold uppercase">Vencidos (Follow-up)</span>
             <div className="text-2xl font-bold mt-2 text-red-500">{dashboard?.vencidos || 0} leads frios</div>
           </div>
@@ -559,16 +554,16 @@ export default function OrcamentosPage() {
       )}
 
       {activeTab === 'contratos' && isSerralheria && (
-        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden flex-1 flex flex-col">
-          <div className="p-4 border-b border-[#2a2a2a] flex gap-4 bg-[#141414]/50">
+        <div className="bg-[#1A1C20] border border-[#2E3238] rounded-xl overflow-hidden flex-1 flex flex-col">
+          <div className="p-4 border-b border-[#2E3238] flex gap-4 bg-[#121316]/50">
             <div className="relative flex-1 max-w-sm">
               <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} aria-hidden="true" />
-              <input value={buscaInput} onChange={e => setBuscaInput(e.target.value)} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg pl-12 pr-4 py-2 text-sm focus:ring-[#b0fb5d] outline-none" placeholder="Buscar contratos..." />
+              <input value={buscaInput} onChange={e => setBuscaInput(e.target.value)} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg pl-12 pr-4 py-2 text-sm focus:ring-[#E4E7EC] outline-none" placeholder="Buscar contratos..." />
             </div>
           </div>
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-[#242424] text-gray-400">
+              <thead className="bg-[#23262B] text-gray-400">
                 <tr>
                   <th className="p-4 font-medium">Nº do Contrato/Orçamento</th>
                   <th className="p-4 font-medium">Cliente (Razão Social)</th>
@@ -580,10 +575,10 @@ export default function OrcamentosPage() {
                   <th className="p-4 font-medium text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#2a2a2a]">
+              <tbody className="divide-y divide-[#2E3238]">
                 {isLoadingOrcs ? Array.from({ length: 5 }, (_, index) => (
                   <tr key={`skeleton-contrato-${index}`} aria-hidden="true">
-                    {Array.from({ length: 8 }, (_, cell) => <td key={cell} className="p-4"><div className="h-4 rounded bg-[#2a2a2a] animate-pulse" /></td>)}
+                    {Array.from({ length: 8 }, (_, cell) => <td key={cell} className="p-4"><div className="h-4 rounded bg-[#2E3238] animate-pulse" /></td>)}
                   </tr>
                 )) : contratosAprovados.length === 0 ? (
                   <tr>
@@ -592,13 +587,13 @@ export default function OrcamentosPage() {
                     </td>
                   </tr>
                 ) : contratosAprovados.map(o => (
-                  <tr key={o.id} className="hover:bg-[#242424] transition-colors group">
+                  <tr key={o.id} className="hover:bg-[#23262B] transition-colors group">
                     <td className="p-4 font-mono text-gray-500">#{String(o.numero).padStart(4, '0')}</td>
-                    <td onClick={() => void openContractEditor(o)} className="p-4 font-bold text-white group-hover:text-[#b0fb5d] cursor-pointer transition-colors">{o.cliente_nome}</td>
+                    <td onClick={() => void openContractEditor(o)} className="p-4 font-bold text-white group-hover:text-[#E4E7EC] cursor-pointer transition-colors">{o.cliente_nome}</td>
                     <td className="p-4 text-gray-400">{new Date(o.aprovado_em || o.created_at).toLocaleDateString('pt-BR')}</td>
                     <td className="p-4 text-gray-400">{o.prazo_entrega || '-'}</td>
                     <td className="p-4 text-gray-400">{o.condicoes_pagamento || '-'}</td>
-                    <td className="p-4 text-right font-mono font-medium text-[#b0fb5d]">{formatCurrency(o.valor_total)}</td>
+                    <td className="p-4 text-right font-mono font-medium text-[#E4E7EC]">{formatCurrency(o.valor_total)}</td>
                     <td className="p-4 text-center">
                       <span className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-green-500/10 text-green-500 border border-green-500/20">
                         {o.status}
@@ -609,7 +604,7 @@ export default function OrcamentosPage() {
                         disabled={loadingContratoId === o.id}
                         onClick={() => void openContractEditor(o)}
                         title="Preencher / Editar Contrato e Cláusulas"
-                        className="px-2.5 py-1.5 text-xs font-medium text-[#b0fb5d] bg-[#b0fb5d]/10 hover:bg-[#b0fb5d]/20 border border-[#b0fb5d]/30 rounded transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                        className="px-2.5 py-1.5 text-xs font-medium text-[#E4E7EC] bg-[#E4E7EC]/10 hover:bg-[#E4E7EC]/20 border border-[#E4E7EC]/30 rounded transition-colors flex items-center gap-1.5 disabled:opacity-50"
                       >
                         <Edit3 size={14} /> Editar Contrato
                       </button>
@@ -617,7 +612,7 @@ export default function OrcamentosPage() {
                         disabled={loadingContratoId === o.id}
                         onClick={() => void handleDownloadContractPdf(o)}
                         title="Baixar PDF do Contrato"
-                        className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2a2a2a] rounded transition-colors disabled:opacity-50"
+                        className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2E3238] rounded transition-colors disabled:opacity-50"
                       >
                         <Download size={16} />
                       </button>
@@ -640,16 +635,16 @@ export default function OrcamentosPage() {
       )}
 
       {activeTab === 'lista' && (
-        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden flex-1 flex flex-col">
-          <div className="p-4 border-b border-[#2a2a2a] flex gap-4 bg-[#141414]/50">
+        <div className="bg-[#1A1C20] border border-[#2E3238] rounded-xl overflow-hidden flex-1 flex flex-col">
+          <div className="p-4 border-b border-[#2E3238] flex gap-4 bg-[#121316]/50">
             <div className="relative flex-1 max-w-sm">
               <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} aria-hidden="true" />
-              <input value={buscaInput} onChange={e => setBuscaInput(e.target.value)} className="w-full bg-[#242424] border border-[#2a2a2a] rounded-lg pl-12 pr-4 py-2 text-sm focus:ring-[#b0fb5d] outline-none" placeholder="Buscar orçamentos..." />
+              <input value={buscaInput} onChange={e => setBuscaInput(e.target.value)} className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg pl-12 pr-4 py-2 text-sm focus:ring-[#E4E7EC] outline-none" placeholder="Buscar orçamentos..." />
             </div>
           </div>
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-[#242424] text-gray-400">
+              <thead className="bg-[#23262B] text-gray-400">
                 <tr>
                   <th className="p-4 font-medium">Cód.</th>
                   <th className="p-4 font-medium">Cliente (Razão Social)</th>
@@ -660,18 +655,18 @@ export default function OrcamentosPage() {
                   <th className="p-4 font-medium text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#2a2a2a]">
+              <tbody className="divide-y divide-[#2E3238]">
                 {isLoadingOrcs ? Array.from({ length: 5 }, (_, index) => (
                   <tr key={`skeleton-${index}`} aria-hidden="true">
-                    {Array.from({ length: 7 }, (_, cell) => <td key={cell} className="p-4"><div className="h-4 rounded bg-[#2a2a2a] animate-pulse" /></td>)}
+                    {Array.from({ length: 7 }, (_, cell) => <td key={cell} className="p-4"><div className="h-4 rounded bg-[#2E3238] animate-pulse" /></td>)}
                   </tr>
                 )) : filteredOrcs.map(o => (
-                  <tr key={o.id} className="hover:bg-[#242424] transition-colors group">
+                  <tr key={o.id} className="hover:bg-[#23262B] transition-colors group">
                     <td className="p-4 font-mono text-gray-500">#{String(o.numero).padStart(4, '0')}</td>
-                    <td className="p-4 font-bold text-white group-hover:text-[#b0fb5d] cursor-pointer transition-colors">{o.cliente_nome}</td>
+                    <td className="p-4 font-bold text-white group-hover:text-[#E4E7EC] cursor-pointer transition-colors">{o.cliente_nome}</td>
                     <td className="p-4 text-gray-400">{new Date(o.created_at).toLocaleDateString('pt-BR')}</td>
                     <td className="p-4 text-gray-400 flex items-center gap-1.5">{o.validade ? new Date(o.validade).toLocaleDateString('pt-BR') : '-'}</td>
-                    <td className="p-4 text-right font-mono font-medium text-[#b0fb5d]">{formatCurrency(o.valor_total)}</td>
+                    <td className="p-4 text-right font-mono font-medium text-[#E4E7EC]">{formatCurrency(o.valor_total)}</td>
                     <td className="p-4 text-center">
                       <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${o.status === 'APROVADO' ? 'bg-green-500/10 text-green-500 border border-green-500/20' : o.status === 'ENVIADO' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : o.status === 'RASCUNHO' ? 'bg-gray-500/10 text-gray-400 border border-gray-500/20' : o.status === 'REPROVADO' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'}`}>
                         {o.status}
@@ -683,7 +678,7 @@ export default function OrcamentosPage() {
                         <button disabled={reprovarMut.isPending} onClick={() => { const motivo=window.prompt('Motivo da reprovação:'); if(motivo) reprovarMut.mutate({id:o.id,motivo}); }} title="Reprovar orçamento" className="p-1.5 text-red-400 hover:bg-red-500/20 rounded transition-colors disabled:opacity-50"><XCircle size={16}/></button>
                       </>}
                       <button disabled={apagarMut.isPending} onClick={() => setOrcamentoParaApagar(o)} title="Apagar orçamento" className="p-1.5 text-red-400 hover:bg-red-500/20 rounded transition-colors disabled:opacity-50"><Trash2 size={16}/></button>
-                      <button disabled={pdfMut.isPending} onClick={() => pdfMut.mutate(o.id)} title="Baixar PDF" className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2a2a2a] rounded transition-colors disabled:opacity-50"><Download size={16}/></button>
+                      <button disabled={pdfMut.isPending} onClick={() => pdfMut.mutate(o.id)} title="Baixar PDF" className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2E3238] rounded transition-colors disabled:opacity-50"><Download size={16}/></button>
                     </td>
                   </tr>
                 ))}
@@ -698,8 +693,8 @@ export default function OrcamentosPage() {
       {isCreating && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={() => setIsCreating(false)} />
-          <div className="relative w-full max-w-4xl bg-[#141414] border-l border-[#2a2a2a] shadow-2xl flex flex-col h-full animate-in slide-in-from-right">
-            <div className="p-6 border-b border-[#2a2a2a] bg-[#0a0a0a] flex justify-between items-center">
+          <div className="relative w-full max-w-4xl bg-[#121316] border-l border-[#2E3238] shadow-2xl flex flex-col h-full animate-in slide-in-from-right">
+            <div className="p-6 border-b border-[#2E3238] bg-[#121316] flex justify-between items-center">
                <h2 className="text-xl font-bold text-white flex items-center gap-2">Novo Orçamento <span className="text-gray-500 text-sm font-normal">Passo {wizardStep} de 2</span></h2>
                <button onClick={() => setIsCreating(false)} className="text-gray-500 hover:text-white"><X size={20}/></button>
             </div>
@@ -708,40 +703,40 @@ export default function OrcamentosPage() {
               {wizardStep === 1 && (
                 <div className="space-y-6 animate-in slide-in-from-left-4">
                   <section>
-                    <h3 className="text-xs font-bold text-[#b0fb5d] uppercase mb-4 flex items-center gap-2"><User size={16}/> Dados do Cliente</h3>
+                    <h3 className="text-xs font-bold text-[#E4E7EC] uppercase mb-4 flex items-center gap-2"><User size={16}/> Dados do Cliente</h3>
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">Cliente Cadastrado *</label>
-                      <select disabled={isLoadingClientes} value={formData.cliente_id} onChange={e => setFormData({...formData, cliente_id: e.target.value})} className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none disabled:opacity-60">
+                      <select disabled={isLoadingClientes} value={formData.cliente_id} onChange={e => setFormData({...formData, cliente_id: e.target.value})} className="w-full bg-[#1A1C20] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none disabled:opacity-60">
                         <option value="">{isLoadingClientes ? 'Carregando clientes…' : isErrorClientes ? 'Falha ao carregar clientes' : '-- Selecione --'}</option>
                         {clientes.map(c => <option key={c.id} value={c.id}>{c.nome} ({c.documento})</option>)}
                       </select>
                     </div>
                     <div className="mt-4">
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">Tipo de orçamento *</label>
-                      <select value={formData.tipo} onChange={e => setFormData({...formData, tipo:e.target.value})} className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none">
+                      <select value={formData.tipo} onChange={e => setFormData({...formData, tipo:e.target.value})} className="w-full bg-[#1A1C20] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none">
                         <option value="SERVICO">Serviço / produção</option>
                         {canCreateRentalQuote && <option value="LOCACAO">Locação</option>}
                       </select>
                     </div>
                   </section>
                   <section>
-                    <h3 className="text-xs font-bold text-[#b0fb5d] uppercase mb-4 mt-8 flex items-center gap-2"><Clock size={16}/> Prazos e Condições</h3>
+                    <h3 className="text-xs font-bold text-[#E4E7EC] uppercase mb-4 mt-8 flex items-center gap-2"><Clock size={16}/> Prazos e Condições</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Validade da Proposta</label>
-                        <input type="date" value={formData.validade} onChange={e => setFormData({...formData, validade: e.target.value})} className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none [color-scheme:dark]" />
+                        <input type="date" value={formData.validade} onChange={e => setFormData({...formData, validade: e.target.value})} className="w-full bg-[#1A1C20] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none [color-scheme:dark]" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Condições de Pagamento</label>
-                        <input value={formData.condicoes_pagamento} onChange={e => setFormData({...formData, condicoes_pagamento: e.target.value})} placeholder="Ex: 50% Entrada, 50% na Entrega" className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" />
+                        <input value={formData.condicoes_pagamento} onChange={e => setFormData({...formData, condicoes_pagamento: e.target.value})} placeholder="Ex: 50% Entrada, 50% na Entrega" className="w-full bg-[#1A1C20] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Prazo de Entrega</label>
-                        <input maxLength={200} value={formData.prazo_entrega} onChange={e => setFormData({...formData, prazo_entrega: e.target.value})} placeholder="Ex: 15 dias úteis após aprovação" className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" />
+                        <input maxLength={200} value={formData.prazo_entrega} onChange={e => setFormData({...formData, prazo_entrega: e.target.value})} placeholder="Ex: 15 dias úteis após aprovação" className="w-full bg-[#1A1C20] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Observações</label>
-                        <input maxLength={1000} value={formData.observacoes} onChange={e => setFormData({...formData, observacoes: e.target.value})} placeholder="Detalhes adicionais para o cliente" className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#b0fb5d] outline-none" />
+                        <input maxLength={1000} value={formData.observacoes} onChange={e => setFormData({...formData, observacoes: e.target.value})} placeholder="Detalhes adicionais para o cliente" className="w-full bg-[#1A1C20] border border-[#2E3238] rounded-lg px-4 py-2.5 text-sm text-white focus:ring-[#E4E7EC] outline-none" />
                       </div>
                     </div>
                   </section>
@@ -752,18 +747,18 @@ export default function OrcamentosPage() {
                 <div className="space-y-6 animate-in slide-in-from-right-4 flex flex-col md:flex-row gap-6">
                   {/* Tabela de Itens */}
                   <div className="flex-1 space-y-4">
-                    <h3 className="text-xs font-bold text-[#b0fb5d] uppercase mb-2">Composição de Itens</h3>
+                    <h3 className="text-xs font-bold text-[#E4E7EC] uppercase mb-2">Composição de Itens</h3>
                     {itens.map((item, idx) => (
-                      <div key={item.id} className="bg-[#1a1a1a] border border-[#2a2a2a] p-4 rounded-xl flex items-start gap-4">
+                      <div key={item.id} className="bg-[#1A1C20] border border-[#2E3238] p-4 rounded-xl flex items-start gap-4">
                         <div className="flex-1 space-y-3">
                           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                             <div className="sm:col-span-3">
                               <label className="text-[10px] text-gray-500 uppercase">Produto / Serviço</label>
-                              <input placeholder="Nome do Produto / Serviço" value={item.produto_nome} onChange={e => { const newI = [...itens]; newI[idx] = { ...newI[idx], produto_nome: e.target.value }; setItens(newI); }} className="w-full bg-[#242424] border border-[#3a3a3a] rounded px-3 py-2 text-sm text-white focus:ring-1 focus:ring-[#b0fb5d] outline-none" />
+                              <input placeholder="Nome do Produto / Serviço" value={item.produto_nome} onChange={e => { const newI = [...itens]; newI[idx] = { ...newI[idx], produto_nome: e.target.value }; setItens(newI); }} className="w-full bg-[#23262B] border border-[#2E3238] rounded px-3 py-2 text-sm text-white focus:ring-1 focus:ring-[#E4E7EC] outline-none" />
                             </div>
                             <div>
                               <label className="text-[10px] text-gray-500 uppercase">Desc. (%)</label>
-                              <input type="number" min="0" max="100" step="0.01" value={item.desconto} onChange={e => { const newI = [...itens]; newI[idx] = { ...newI[idx], desconto: Number(e.target.value) }; setItens(newI); }} className="w-full bg-[#242424] border border-[#3a3a3a] rounded px-3 py-2 text-sm text-white focus:ring-[#b0fb5d] outline-none" />
+                              <input type="number" min="0" max="100" step="0.01" value={item.desconto} onChange={e => { const newI = [...itens]; newI[idx] = { ...newI[idx], desconto: Number(e.target.value) }; setItens(newI); }} className="w-full bg-[#23262B] border border-[#2E3238] rounded px-3 py-2 text-sm text-white focus:ring-[#E4E7EC] outline-none" />
                             </div>
                           </div>
 
@@ -784,7 +779,7 @@ export default function OrcamentosPage() {
                                     newI[idx] = { ...newI[idx], unidades_ativas: nextUnits };
                                     setItens(newI);
                                   }}
-                                  className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors ${isActive ? 'bg-[#b0fb5d]/15 text-[#b0fb5d] border-[#b0fb5d]/40' : 'bg-[#242424] text-gray-400 border-[#3a3a3a] hover:text-white'}`}
+                                  className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors ${isActive ? 'bg-[#E4E7EC]/15 text-[#E4E7EC] border-[#E4E7EC]/40' : 'bg-[#23262B] text-gray-400 border-[#2E3238] hover:text-white'}`}
                                 >
                                   {isActive ? '✓ ' : '+ '}{UNIT_FULL_LABEL[unit]}
                                 </button>
@@ -798,10 +793,10 @@ export default function OrcamentosPage() {
                               const measureVal = item.medidas_valores[unit] || { quantidade: 0, valor_unitario: 0 };
                               const measureSubtotal = (Number(measureVal.quantidade) || 0) * (Number(measureVal.valor_unitario) || 0);
                               return (
-                                <div key={unit} className="grid grid-cols-12 gap-2 items-end bg-[#141414]/70 border border-[#2a2a2a] rounded-lg p-2.5">
+                                <div key={unit} className="grid grid-cols-12 gap-2 items-end bg-[#121316]/70 border border-[#2E3238] rounded-lg p-2.5">
                                   <div className="col-span-3">
                                     <span className="text-[10px] text-gray-400 uppercase block">Medida</span>
-                                    <span className="text-xs font-bold text-[#b0fb5d]">{UNIT_FULL_LABEL[unit]}</span>
+                                    <span className="text-xs font-bold text-[#E4E7EC]">{UNIT_FULL_LABEL[unit]}</span>
                                   </div>
                                   <div className="col-span-4">
                                     <label className="text-[10px] text-gray-500 uppercase block">Qtd ({UNIT_SHORT_LABEL[unit]})</label>
@@ -821,7 +816,7 @@ export default function OrcamentosPage() {
                                         };
                                         setItens(newI);
                                       }}
-                                      className="w-full bg-[#242424] border border-[#3a3a3a] rounded px-2.5 py-1.5 text-sm text-white focus:ring-[#b0fb5d] outline-none"
+                                      className="w-full bg-[#23262B] border border-[#2E3238] rounded px-2.5 py-1.5 text-sm text-white focus:ring-[#E4E7EC] outline-none"
                                     />
                                   </div>
                                   <div className="col-span-3">
@@ -842,7 +837,7 @@ export default function OrcamentosPage() {
                                         };
                                         setItens(newI);
                                       }}
-                                      className="w-full bg-[#242424] border border-[#3a3a3a] rounded px-2.5 py-1.5 text-sm text-white focus:ring-[#b0fb5d] outline-none"
+                                      className="w-full bg-[#23262B] border border-[#2E3238] rounded px-2.5 py-1.5 text-sm text-white focus:ring-[#E4E7EC] outline-none"
                                     />
                                   </div>
                                   <div className="col-span-2 text-right">
@@ -857,7 +852,7 @@ export default function OrcamentosPage() {
                         <button onClick={() => setItens(itens.filter(i => i.id !== item.id))} className="text-red-500 hover:bg-red-500/20 p-2 rounded transition-colors mt-6"><Trash2 size={16}/></button>
                       </div>
                     ))}
-                    <button onClick={() => setItens([...itens, createEmptyWizardItem()])} className="w-full py-3 border-2 border-dashed border-[#2a2a2a] rounded-xl text-gray-500 hover:text-[#b0fb5d] hover:border-[#b0fb5d] transition-colors text-sm font-bold flex justify-center items-center gap-2">
+                    <button onClick={() => setItens([...itens, createEmptyWizardItem()])} className="w-full py-3 border-2 border-dashed border-[#2E3238] rounded-xl text-gray-500 hover:text-[#E4E7EC] hover:border-[#E4E7EC] transition-colors text-sm font-bold flex justify-center items-center gap-2">
                       <Plus size={16}/> Adicionar Linha
                     </button>
                   </div>
@@ -866,7 +861,7 @@ export default function OrcamentosPage() {
                   <div className="w-[300px] shrink-0 bg-white text-black p-6 rounded-lg shadow-xl relative aspect-[1/1.4] overflow-hidden opacity-90 scale-95 origin-top">
                     <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-gray-100 z-0"></div>
                     <div className="relative z-10 flex flex-col h-full">
-                       <h4 className="text-xl font-black mb-4 uppercase text-[#b0fb5d] bg-black p-2 rounded">Sua Empresa</h4>
+                       <h4 className="text-xl font-black mb-4 uppercase text-[#E4E7EC] bg-black p-2 rounded">Sua Empresa</h4>
                        <p className="text-[10px] text-gray-500 border-b pb-2">Orçamento #{String(Date.now()).slice(-4)}</p>
                        <div className="mt-4 flex-1">
                           <p className="text-[10px] font-bold text-gray-800">ITENS</p>
@@ -894,14 +889,14 @@ export default function OrcamentosPage() {
               )}
             </div>
             
-            <div className="p-6 border-t border-[#2a2a2a] bg-[#0a0a0a] flex justify-between">
+            <div className="p-6 border-t border-[#2E3238] bg-[#121316] flex justify-between">
               <button onClick={() => wizardStep === 1 ? setIsCreating(false) : setWizardStep(1)} className="px-4 py-2 text-sm text-gray-400 hover:text-white">
                 {wizardStep === 1 ? 'Cancelar' : 'Voltar'}
               </button>
               {wizardStep === 1 ? (
-                 <button onClick={() => setWizardStep(2)} className="bg-[#2a2a2a] text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#3a3a3a]">Próximo: Itens & Valores</button>
+                 <button onClick={() => setWizardStep(2)} className="bg-[#2E3238] text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#2E3238]">Próximo: Itens & Valores</button>
               ) : (
-                 <button onClick={handleCreate} disabled={createMut.isPending} className="bg-[#b0fb5d] text-black px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#9de44f] flex items-center gap-2">
+                 <button onClick={handleCreate} disabled={createMut.isPending} className="bg-[#E4E7EC] text-[#121316] px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#D4D8DF] flex items-center gap-2">
                    <Send size={16}/> {createMut.isPending ? 'Salvando...' : 'Salvar Orçamento'}
                  </button>
               )}
@@ -913,7 +908,7 @@ export default function OrcamentosPage() {
       {orcamentoParaAprovar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOrcamentoParaAprovar(null)} />
-          <div className="relative w-full max-w-md rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-6 shadow-2xl">
+          <div className="relative w-full max-w-md rounded-xl border border-[#2E3238] bg-[#1A1C20] p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h2 className="text-lg font-bold text-white">Aprovar locação</h2>
@@ -921,17 +916,17 @@ export default function OrcamentosPage() {
               </div>
               <button onClick={() => setOrcamentoParaAprovar(null)} className="text-gray-500 hover:text-white"><X size={20}/></button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <label className="text-xs text-gray-400">Início da locação
-                <input type="date" value={periodoLocacao.data_inicio} onChange={event => setPeriodoLocacao({...periodoLocacao, data_inicio: event.target.value})} className="mt-1.5 w-full rounded-lg border border-[#2a2a2a] bg-[#242424] px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:ring-1 focus:ring-[#b0fb5d]" />
+            <div className="space-y-3">
+              <label className="block text-xs text-gray-400">Data de retirada
+                <input type="date" value={periodoLocacao.data_inicio} onChange={event => setPeriodoLocacao({ data_inicio: event.target.value })} className="mt-1.5 w-full rounded-lg border border-[#2E3238] bg-[#23262B] px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:ring-1 focus:ring-[#E4E7EC]" />
               </label>
-              <label className="text-xs text-gray-400">Fim da locação
-                <input type="date" value={periodoLocacao.data_fim_prevista} onChange={event => setPeriodoLocacao({...periodoLocacao, data_fim_prevista: event.target.value})} className="mt-1.5 w-full rounded-lg border border-[#2a2a2a] bg-[#242424] px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:ring-1 focus:ring-[#b0fb5d]" />
-              </label>
+              <p className="text-xs text-[#9CA1AA] rounded-lg border border-[#2E3238] bg-[#23262B]/60 px-3 py-2.5">
+                O contrato será criado sem data final obrigatória, com renovação mensal automática a partir da data de retirada.
+              </p>
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button onClick={() => setOrcamentoParaAprovar(null)} className="rounded-lg px-4 py-2 text-sm text-gray-400 hover:text-white">Cancelar</button>
-              <button onClick={confirmarAprovacaoLocacao} disabled={aprovarMut.isPending} className="rounded-lg bg-[#b0fb5d] px-5 py-2.5 text-sm font-bold text-black hover:bg-[#9de44f] disabled:opacity-50">
+              <button onClick={confirmarAprovacaoLocacao} disabled={aprovarMut.isPending} className="rounded-lg bg-[#E4E7EC] px-5 py-2.5 text-sm font-bold text-[#121316] hover:bg-[#D4D8DF] disabled:opacity-50">
                 {aprovarMut.isPending ? 'Aprovando…' : 'Aprovar e gerar conta'}
               </button>
             </div>
@@ -942,7 +937,7 @@ export default function OrcamentosPage() {
       {orcamentoParaApagar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOrcamentoParaApagar(null)} />
-          <div className="relative w-full max-w-md rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-6 shadow-2xl">
+          <div className="relative w-full max-w-md rounded-xl border border-[#2E3238] bg-[#1A1C20] p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Trash2 size={18} className="text-red-400" />
@@ -967,11 +962,11 @@ export default function OrcamentosPage() {
       {contratoEditando && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={() => setContratoEditando(null)} />
-          <div className="relative w-full max-w-4xl bg-[#141414] border-l border-[#2a2a2a] shadow-2xl flex flex-col h-full animate-in slide-in-from-right">
-            <div className="p-6 border-b border-[#2a2a2a] bg-[#0a0a0a] flex justify-between items-center">
+          <div className="relative w-full max-w-4xl bg-[#121316] border-l border-[#2E3238] shadow-2xl flex flex-col h-full animate-in slide-in-from-right">
+            <div className="p-6 border-b border-[#2E3238] bg-[#121316] flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <FileSignature className="text-[#b0fb5d]" size={22} />
+                  <FileSignature className="text-[#E4E7EC]" size={22} />
                   Contrato #{String(contratoEditando.numero).padStart(4, '0')} · {contratoEditando.cliente_nome}
                 </h2>
                 <p className="text-xs text-gray-400 mt-1">
@@ -982,7 +977,7 @@ export default function OrcamentosPage() {
             </div>
 
             {/* Abas do Editor de Contrato */}
-            <div className="flex gap-2 px-6 pt-3 border-b border-[#2a2a2a] bg-[#101010] overflow-x-auto no-scrollbar">
+            <div className="flex gap-2 px-6 pt-3 border-b border-[#2E3238] bg-[#121316] overflow-x-auto no-scrollbar">
               {[
                 { id: 'partes', label: '1. Contratante e Contratado' },
                 { id: 'objeto_prazos', label: '2. Objeto, Prazos e Data' },
@@ -995,7 +990,7 @@ export default function OrcamentosPage() {
                   onClick={() => setContratoTab(tab.id as typeof contratoTab)}
                   className={`px-3 py-2.5 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
                     contratoTab === tab.id
-                      ? 'border-[#b0fb5d] text-[#b0fb5d]'
+                      ? 'border-[#E4E7EC] text-[#E4E7EC]'
                       : 'border-transparent text-gray-400 hover:text-white'
                   }`}
                 >
@@ -1007,8 +1002,8 @@ export default function OrcamentosPage() {
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {contratoTab === 'partes' && (
                 <div className="space-y-6">
-                  <section className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-5 space-y-4">
-                    <h3 className="text-xs font-bold text-[#b0fb5d] uppercase tracking-wider">Cabeçalho do Contrato</h3>
+                  <section className="bg-[#1A1C20] border border-[#2E3238] rounded-xl p-5 space-y-4">
+                    <h3 className="text-xs font-bold text-[#E4E7EC] uppercase tracking-wider">Cabeçalho do Contrato</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Título Principal (opcional)</label>
@@ -1016,7 +1011,7 @@ export default function OrcamentosPage() {
                           value={contratoForm.titulo_principal}
                           onChange={e => setContratoForm({ ...contratoForm, titulo_principal: e.target.value })}
                           placeholder="CONTRATO DE PRESTAÇÃO DE SERVIÇOS"
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                       <div>
@@ -1025,14 +1020,14 @@ export default function OrcamentosPage() {
                           value={contratoForm.subtitulo}
                           onChange={e => setContratoForm({ ...contratoForm, subtitulo: e.target.value })}
                           placeholder="SERRALHERIA ARTSTEEL"
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                     </div>
                   </section>
 
-                  <section className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-5 space-y-4">
-                    <h3 className="text-xs font-bold text-[#b0fb5d] uppercase tracking-wider">Dados do Contratante (Cliente)</h3>
+                  <section className="bg-[#1A1C20] border border-[#2E3238] rounded-xl p-5 space-y-4">
+                    <h3 className="text-xs font-bold text-[#E4E7EC] uppercase tracking-wider">Dados do Contratante (Cliente)</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="md:col-span-2">
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Nome / Razão Social (opcional)</label>
@@ -1040,7 +1035,7 @@ export default function OrcamentosPage() {
                           value={contratoForm.contratante_nome}
                           onChange={e => setContratoForm({ ...contratoForm, contratante_nome: e.target.value })}
                           placeholder="Ex: Alessandra Maria Afonso Teixeira"
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                       <div>
@@ -1049,7 +1044,7 @@ export default function OrcamentosPage() {
                           value={contratoForm.contratante_documento}
                           onChange={e => setContratoForm({ ...contratoForm, contratante_documento: e.target.value })}
                           placeholder="000.000.000-00"
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                       <div>
@@ -1058,7 +1053,7 @@ export default function OrcamentosPage() {
                           value={contratoForm.contratante_estado_civil}
                           onChange={e => setContratoForm({ ...contratoForm, contratante_estado_civil: e.target.value })}
                           placeholder="Ex: Casada, Solteiro(a)..."
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                       <div>
@@ -1067,7 +1062,7 @@ export default function OrcamentosPage() {
                           value={contratoForm.contratante_profissao}
                           onChange={e => setContratoForm({ ...contratoForm, contratante_profissao: e.target.value })}
                           placeholder="Ex: Advogada, Empresário..."
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                       <div>
@@ -1076,7 +1071,7 @@ export default function OrcamentosPage() {
                           value={contratoForm.contratante_contato}
                           onChange={e => setContratoForm({ ...contratoForm, contratante_contato: e.target.value })}
                           placeholder="E-mail e/ou telefone"
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                       <div className="md:col-span-3">
@@ -1085,25 +1080,25 @@ export default function OrcamentosPage() {
                           value={contratoForm.contratante_endereco}
                           onChange={e => setContratoForm({ ...contratoForm, contratante_endereco: e.target.value })}
                           placeholder="Rua, número, bairro, cidade - UF, CEP"
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                     </div>
-                    <div className="bg-[#141414] border border-[#2a2a2a] rounded-lg p-3 text-xs text-gray-300">
+                    <div className="bg-[#121316] border border-[#2E3238] rounded-lg p-3 text-xs text-gray-300">
                       <span className="font-bold text-white">Prévia no PDF — CONTRATANTE: </span>
                       {buildContratanteQualification(contratoForm) || <span className="text-gray-500 italic">(Em branco)</span>}
                     </div>
                   </section>
 
-                  <section className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-5 space-y-4">
-                    <h3 className="text-xs font-bold text-[#b0fb5d] uppercase tracking-wider">Dados do Contratado (ArtSteel)</h3>
+                  <section className="bg-[#1A1C20] border border-[#2E3238] rounded-xl p-5 space-y-4">
+                    <h3 className="text-xs font-bold text-[#E4E7EC] uppercase tracking-wider">Dados do Contratado (ArtSteel)</h3>
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">Qualificação do Contratado (opcional)</label>
                       <textarea
                         rows={3}
                         value={contratoForm.contratado_qualificacao}
                         onChange={e => setContratoForm({ ...contratoForm, contratado_qualificacao: e.target.value })}
-                        className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                        className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                       />
                     </div>
                     <div>
@@ -1112,7 +1107,7 @@ export default function OrcamentosPage() {
                         value={contratoForm.contratado_nome_assinatura}
                         onChange={e => setContratoForm({ ...contratoForm, contratado_nome_assinatura: e.target.value })}
                         placeholder="FILOMENO SERVICOS LTDA (Filomeno Pereira Neto)"
-                        className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                        className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                       />
                     </div>
                   </section>
@@ -1121,8 +1116,8 @@ export default function OrcamentosPage() {
 
               {contratoTab === 'objeto_prazos' && (
                 <div className="space-y-6">
-                  <section className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-5 space-y-4">
-                    <h3 className="text-xs font-bold text-[#b0fb5d] uppercase tracking-wider">Cláusula 1 – Objeto do Contrato</h3>
+                  <section className="bg-[#1A1C20] border border-[#2E3238] rounded-xl p-5 space-y-4">
+                    <h3 className="text-xs font-bold text-[#E4E7EC] uppercase tracking-wider">Cláusula 1 – Objeto do Contrato</h3>
                     <p className="text-xs text-gray-400">
                       Descreve o serviço/produto contratado. Alterar este campo atualiza automaticamente o texto da Cláusula 1.
                     </p>
@@ -1131,12 +1126,12 @@ export default function OrcamentosPage() {
                       value={contratoForm.objeto_resumo}
                       onChange={e => updateObjetoResumo(e.target.value)}
                       placeholder="Ex: O presente contrato tem por objeto a produção e instalação de um guarda corpo e um corrimão."
-                      className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                      className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                     />
                   </section>
 
-                  <section className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-5 space-y-4">
-                    <h3 className="text-xs font-bold text-[#b0fb5d] uppercase tracking-wider">Prazo de Execução e Local/Data</h3>
+                  <section className="bg-[#1A1C20] border border-[#2E3238] rounded-xl p-5 space-y-4">
+                    <h3 className="text-xs font-bold text-[#E4E7EC] uppercase tracking-wider">Prazo de Execução e Local/Data</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">Prazo de Execução (Cláusula 3, item e)</label>
@@ -1144,7 +1139,7 @@ export default function OrcamentosPage() {
                           value={contratoForm.prazo_execucao}
                           onChange={e => updatePrazoExecucao(e.target.value)}
                           placeholder="Ex: 30 dias após a assinatura do contrato"
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                       <div>
@@ -1153,7 +1148,7 @@ export default function OrcamentosPage() {
                           value={contratoForm.cidade_assinatura}
                           onChange={e => setContratoForm({ ...contratoForm, cidade_assinatura: e.target.value })}
                           placeholder="Timóteo -MG"
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                       <div>
@@ -1162,7 +1157,7 @@ export default function OrcamentosPage() {
                           value={contratoForm.data_assinatura}
                           onChange={e => setContratoForm({ ...contratoForm, data_assinatura: e.target.value })}
                           placeholder="DD/MM/AAAA"
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                     </div>
@@ -1172,13 +1167,13 @@ export default function OrcamentosPage() {
 
               {contratoTab === 'valores_pagamento' && (
                 <div className="space-y-6">
-                  <section className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-5 space-y-4">
+                  <section className="bg-[#1A1C20] border border-[#2E3238] rounded-xl p-5 space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="text-xs font-bold text-[#b0fb5d] uppercase tracking-wider">Cláusula 4 – Valor e Forma de Pagamento</h3>
+                      <h3 className="text-xs font-bold text-[#E4E7EC] uppercase tracking-wider">Cláusula 4 – Valor e Forma de Pagamento</h3>
                       <button
                         type="button"
                         onClick={recalcularParcelas50}
-                        className="text-xs px-3 py-1.5 rounded bg-[#242424] hover:bg-[#333] text-[#b0fb5d] border border-[#3a3a3a] transition-colors"
+                        className="text-xs px-3 py-1.5 rounded bg-[#23262B] hover:bg-[#2E3238] text-[#E4E7EC] border border-[#2E3238] transition-colors"
                       >
                         Calcular 50% Entrada / 50% Conclusão automaticamente
                       </button>
@@ -1192,7 +1187,7 @@ export default function OrcamentosPage() {
                           value={contratoForm.valor_total}
                           onChange={e => updateValoresClausula4({ valor_total: e.target.value })}
                           placeholder="4000.00"
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                       <div>
@@ -1201,7 +1196,7 @@ export default function OrcamentosPage() {
                           value={contratoForm.valor_extenso}
                           onChange={e => updateValoresClausula4({ valor_extenso: e.target.value })}
                           placeholder="quatro mil reais"
-                          className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                       </div>
                     </div>
@@ -1212,7 +1207,7 @@ export default function OrcamentosPage() {
                         value={contratoForm.parcelas_texto}
                         onChange={e => updateValoresClausula4({ parcelas_texto: e.target.value })}
                         placeholder="**1ª parcela (entrada, 50%):** R$ 2.000,00, pagos no ato da assinatura do contrato;"
-                        className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                        className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                       />
                     </div>
                     <div>
@@ -1221,7 +1216,7 @@ export default function OrcamentosPage() {
                         rows={3}
                         value={contratoForm.dados_bancarios}
                         onChange={e => updateValoresClausula4({ dados_bancarios: e.target.value })}
-                        className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                        className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3.5 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                       />
                     </div>
                   </section>
@@ -1232,7 +1227,7 @@ export default function OrcamentosPage() {
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <h3 className="text-xs font-bold text-[#b0fb5d] uppercase tracking-wider">Cláusulas do Contrato</h3>
+                      <h3 className="text-xs font-bold text-[#E4E7EC] uppercase tracking-wider">Cláusulas do Contrato</h3>
                       <p className="text-xs text-gray-400 mt-0.5">
                         Edite livremente o título ou o conteúdo de qualquer cláusula, ou adicione novas cláusulas ao contrato.
                       </p>
@@ -1251,14 +1246,14 @@ export default function OrcamentosPage() {
                         setContratoForm(prev => ({ ...prev, clausulas: padrao.clausulas }));
                         toast.success('Cláusulas padrão restauradas.');
                       }}
-                      className="text-xs px-3 py-1.5 rounded bg-[#242424] hover:bg-[#333] text-gray-300 border border-[#3a3a3a] flex items-center gap-1.5 transition-colors"
+                      className="text-xs px-3 py-1.5 rounded bg-[#23262B] hover:bg-[#2E3238] text-gray-300 border border-[#2E3238] flex items-center gap-1.5 transition-colors"
                     >
                       <RotateCcw size={13} /> Restaurar Cláusulas Padrão
                     </button>
                   </div>
 
                   {contratoForm.clausulas.map((clausula, idx) => (
-                    <div key={clausula.id} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 space-y-3">
+                    <div key={clausula.id} className="bg-[#1A1C20] border border-[#2E3238] rounded-xl p-4 space-y-3">
                       <div className="flex items-center justify-between gap-3">
                         <input
                           value={clausula.titulo}
@@ -1268,7 +1263,7 @@ export default function OrcamentosPage() {
                             setContratoForm({ ...contratoForm, clausulas: novas });
                           }}
                           placeholder={`CLÁUSULA ${idx + 1} – TÍTULO DA CLÁUSULA`}
-                          className="flex-1 bg-[#242424] border border-[#3a3a3a] rounded-lg px-3 py-2 text-xs font-bold text-[#b0fb5d] uppercase outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                          className="flex-1 bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2 text-xs font-bold text-[#E4E7EC] uppercase outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                         />
                         <button
                           type="button"
@@ -1293,7 +1288,7 @@ export default function OrcamentosPage() {
                           setContratoForm({ ...contratoForm, clausulas: novas });
                         }}
                         placeholder="Texto da cláusula..."
-                        className="w-full bg-[#242424] border border-[#3a3a3a] rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#b0fb5d]"
+                        className="w-full bg-[#23262B] border border-[#2E3238] rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#E4E7EC]"
                       />
                     </div>
                   ))}
@@ -1314,7 +1309,7 @@ export default function OrcamentosPage() {
                         ],
                       });
                     }}
-                    className="w-full py-3 border-2 border-dashed border-[#2a2a2a] rounded-xl text-gray-400 hover:text-[#b0fb5d] hover:border-[#b0fb5d] transition-colors text-sm font-bold flex justify-center items-center gap-2"
+                    className="w-full py-3 border-2 border-dashed border-[#2E3238] rounded-xl text-gray-400 hover:text-[#E4E7EC] hover:border-[#E4E7EC] transition-colors text-sm font-bold flex justify-center items-center gap-2"
                   >
                     <Plus size={16} /> Adicionar Nova Cláusula
                   </button>
@@ -1322,7 +1317,7 @@ export default function OrcamentosPage() {
               )}
             </div>
 
-            <div className="p-6 border-t border-[#2a2a2a] bg-[#0a0a0a] flex flex-wrap justify-between items-center gap-3">
+            <div className="p-6 border-t border-[#2E3238] bg-[#121316] flex flex-wrap justify-between items-center gap-3">
               <button
                 type="button"
                 onClick={() => setContratoEditando(null)}
@@ -1335,7 +1330,7 @@ export default function OrcamentosPage() {
                   type="button"
                   disabled={savingContrato}
                   onClick={() => void handleSaveContract(false)}
-                  className="bg-[#2a2a2a] text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-[#3a3a3a] disabled:opacity-50"
+                  className="bg-[#2E3238] text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-[#2E3238] disabled:opacity-50"
                 >
                   {savingContrato ? 'Salvando…' : 'Salvar Alterações'}
                 </button>
@@ -1343,7 +1338,7 @@ export default function OrcamentosPage() {
                   type="button"
                   disabled={savingContrato}
                   onClick={() => void handleSaveContract(true)}
-                  className="bg-[#b0fb5d] text-black px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-[#9de44f] flex items-center gap-2 disabled:opacity-50"
+                  className="bg-[#E4E7EC] text-[#121316] px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-[#D4D8DF] flex items-center gap-2 disabled:opacity-50"
                 >
                   <Download size={16} /> {savingContrato ? 'Gerando…' : 'Salvar e Baixar PDF'}
                 </button>
