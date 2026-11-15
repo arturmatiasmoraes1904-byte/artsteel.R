@@ -192,12 +192,19 @@ test('full migrate.ts chain (v1..v22) executes cleanly and grants nexo_app permi
       return { statusCode: res.statusCode, body: JSON.parse(res.body) as T, rawBody: res.body };
     };
 
-    const loginRes = await injectJson<{ success: boolean; data: { token: string } }>('POST', '/auth/login', undefined, {
+    const loginRes = await injectJson<{
+      success: boolean;
+      data: { token: string; userTenants: Array<{ cnpj: string; razao_social: string }> };
+    }>('POST', '/auth/login', undefined, {
       email: 'admin@artsteel.local',
       password: 'ArtSteel-Migracao-2026!',
       rememberMe: true,
     });
     assert.equal(loginRes.statusCode, 200, loginRes.rawBody);
+    assert.ok(
+      loginRes.body.data.userTenants.some(t => t.cnpj === '51972840000157' && t.razao_social === 'Filomeno Serviços Ltda.'),
+      loginRes.rawBody,
+    );
     const token = loginRes.body.data.token;
 
     const preMigrationDashRes = await injectJson<{ data: { proximas_renovacoes: number | string } }>(

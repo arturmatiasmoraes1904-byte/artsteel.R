@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $target = Join-Path $projectRoot 'apps\api\.env'
 if (Test-Path -LiteralPath $target) { throw 'apps/api/.env já existe. Nenhuma configuração foi substituída.' }
@@ -18,8 +18,8 @@ $jwtSecret = New-LocalSecret
 $encodedAdmin = [Uri]::EscapeDataString($databasePassword)
 $encodedApp = [Uri]::EscapeDataString($appPassword)
 $configuration = @(
-  "DATABASE_ADMIN_URL=postgresql://postgres.abwkrotpfamfkypghfxy:$encodedAdmin@aws-0-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
-  "DATABASE_URL=postgresql://nexo_app.abwkrotpfamfkypghfxy:$encodedApp@aws-0-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require"
+  "DATABASE_ADMIN_URL=postgresql://postgres.ufvuirjgycmmgzjtumwz:$encodedAdmin@aws-0-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
+  "DATABASE_URL=postgresql://nexo_app.ufvuirjgycmmgzjtumwz:$encodedApp@aws-0-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require"
   "DATABASE_APP_PASSWORD=$appPassword"
   "JWT_SECRET=$jwtSecret"
   'WEB_ORIGIN=http://localhost:3000'

@@ -1,6 +1,6 @@
 # Supabase e Vercel
 
-Projeto: abwkrotpfamfkypghfxy (nexo-operacoes, São Paulo).
+Projeto: ufvuirjgycmmgzjtumwz (ArtSteel, São Paulo).
 
 ## Preparar a conexão local
 
@@ -10,7 +10,7 @@ O backend usa PostgreSQL diretamente. O login continua na nossa API; não precis
 2. Configure DATABASE_ADMIN_URL em apps/api/.env com essa conexão e a senha do banco. Codifique caracteres reservados na senha da URL. Não envie a conexão com senha pelo chat.
 3. Configure DATABASE_APP_PASSWORD com uma senha aleatória exclusiva de pelo menos 24 caracteres para o role nexo_app.
 4. Execute npm run db:migrate. As tabelas e o role restrito serão criados. Se nexo_app já existir, sua senha será preservada.
-5. Copie a conexão Transaction pooler para DATABASE_URL. Substitua o usuário por nexo_app.abwkrotpfamfkypghfxy e use a senha do passo 3. Preserve o host e a porta fornecidos pelo painel. Configure SSL conforme o painel.
+5. Copie a conexão Transaction pooler para DATABASE_URL. Substitua o usuário por nexo_app.ufvuirjgycmmgzjtumwz e use a senha do passo 3. Preserve o host e a porta fornecidos pelo painel. Configure SSL conforme o painel.
 6. Defina JWT_SECRET aleatório, com no mínimo 32 caracteres, e WEB_ORIGIN.
 
 A API usa prepare: false e pool pequeno. A variável de contexto RLS é definida dentro de cada transação. As tabelas do sistema, incluindo o catálogo de identidade, não ficam acessíveis aos roles anon/authenticated da Data API.
